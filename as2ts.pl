@@ -161,7 +161,7 @@ sub checkSkipDir
 sub checkSkipFile
 {
 	my $input=shift;
-	return ($input !~ /Profiler.as/ || $input =~ /DecodeUtil\.as/ || $input =~ /EncodeUtil\.as/);
+	return ($input !~ /IPoolObject.as/ || $input =~ /DecodeUtil\.as/ || $input =~ /EncodeUtil\.as/);
 }
 
 ##
@@ -269,11 +269,12 @@ sub scanFile
 					}
 				}	      
 			}            
-		} elsif($line =~ s/(?:public )?(?:final )?class (\w+)/export class $1/) {
+		} elsif($line =~ s/(?:public )?(?:final )?(class |interface )(\w+)/export $1 $2/) {
 			# 转换class声明
 			$inFunc = 0;
 
 			$var_1 = $1; # 先保存匹配变量，防止下面执行正则时被改
+			$var_2 = $2;
 
 			if(defined $className) {
 				# 标记上一个类的结束行
@@ -295,7 +296,7 @@ sub scanFile
 				}
 			}
 			# 标记起始行
-			$className = $var_1;
+			$className = $var_2;
 			my @classScopeArr = ($i, $i);
 			$classScopeMap{$className} = [@classScopeArr];
 
@@ -637,6 +638,9 @@ sub scanFile
 	# 由于getter和setter现在scope重合在一起没有区分开，可能导致其中一个出现this.xxx的现象，处理一下
 	$allTsContents =~ s/(?!<\w)set this\.(?=\w+\()/set /g;
 	$allTsContents =~ s/(?!<\w)get this\.(?=\w+\()/get /g;
+
+	# 去掉可能遗漏的function关键字，比如interface里的
+	$allTsContents =~ s/(?!<\w)function //g;
     # 去掉__JS__()
     $allTsContents =~ s/__JS__\(['|"](.+)['|"]\)/$1/g;
 	
