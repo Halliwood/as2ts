@@ -372,6 +372,8 @@ sub scanFile
 				$getterSetter = 'get' eq $1 ? 1 : 2;
 				$funcName = $2;
 				$isEnum = 0;
+				# 当成属性处理，这样后面会加上this
+				$propertiesMap{$className.'+'.$funcName} = 1;
 			} else {
 				$funcName = $var_3;
 				$isEnum = 0;
@@ -540,14 +542,13 @@ sub scanFile
 		if($funcEnd == $funcStart) {
 			$funcEnd = $totalLineNum - 1;
 		}
-		#print("$funcName: $funcStart, $funcEnd\n");
 
 		my $funcParamNameArr = $funcMap{$funcKey};
 		my $funcParamCount = scalar(@$funcParamNameArr);
 		my $funcLine, my $thisStr;
 
 		# 先处理成员变量
-		foreach $propertyKey (keys %propertiesMap) {        
+		foreach $propertyKey (keys %propertiesMap) { 
 			# 按照类名+属性名解开
 			$propertyKey =~ /([^\+]+)\+(.*)/;  
 			my $tmpClassName = $1;
