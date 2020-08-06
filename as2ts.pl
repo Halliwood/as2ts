@@ -161,7 +161,7 @@ sub checkSkipDir
 sub checkSkipFile
 {
 	my $input=shift;
-	return ($input !~ /WeixinConfig.as/ || $input =~ /DecodeUtil\.as/ || $input =~ /EncodeUtil\.as/);
+	return ($input !~ /Profiler.as/ || $input =~ /DecodeUtil\.as/ || $input =~ /EncodeUtil\.as/);
 }
 
 ##
@@ -486,29 +486,31 @@ sub scanFile
 				if('' ne $varStr) {
 					$varStr.=', ';
 				}
-				$varUnit =~ /(\S+)\s?:\s?([^\s=]+)(.*)/;
+				$varUnit =~ /(\S+)\s?:?\s?([^\s=]*)(.*)/;
 				$var_s1 = $1;
 				$var_s2 = $2;
 				$var_s3 = $3;
+				print("$i: local var: $varUnit, $var_s1, $var_s2, $var_s3\n");
 
 				$varStr.=$var_s1;
+				my $tmpTsType = '';
 				if('' ne $var_s2) {
 					# 有类型
-					my $tmpTsType = asType2tsType($var_s2);
+					$tmpTsType = asType2tsType($var_s2);
 					$varStr.=': '.$tmpTsType;
-					if('' ne $var_s3 && $var_s3 =~ /^\s*=/) {
-						# 有初始化
-						$var_s3 =~ s/^\s*=\s*//;
-						$varStr.=' = '.asInit2tsInit($var_s3);
-					} else {
-						# number类型自动初始化为0
-						if('number' ne $var_s2 && 'number' eq $tmpTsType) {
-							$varStr.=' = 0';
-						} elsif('boolean' ne $var_s2 && 'boolean' eq $tmpTsType) {
-							$varStr.=' = false';
-						}
-						$varStr.=$var_s3;
+				}
+				if('' ne $var_s3 && $var_s3 =~ /^\s*=/) {
+					# 有初始化
+					$var_s3 =~ s/^\s*=\s*//;
+					$varStr.=' = '.asInit2tsInit($var_s3);
+				} elsif($tmpTsType) {
+					# number类型自动初始化为0
+					if('number' ne $var_s2 && 'number' eq $tmpTsType) {
+						$varStr.=' = 0';
+					} elsif('boolean' ne $var_s2 && 'boolean' eq $tmpTsType) {
+						$varStr.=' = false';
 					}
+					$varStr.=$var_s3;
 				}
 				# 如果当前在成员函数内，将临时变量保存起来
 				if(1 == $inFunc && defined $inFuncName) {
@@ -661,6 +663,9 @@ sub scanFile
 	
 	$allTsContents =~ s/System\/net\/FyProtocol\/Macros/System\/protocol\/Macros/g;
 	$allTsContents =~ s/System\/utils\/keyword\/KeyWord/System\/constants\/KeyWord/g;
+
+	# trace 改 console.log
+	$allTsContents =~ s/(?<![\w\.])trace(?=\()/console.log/g;
 	
 	# Number 改 number
 	$allTsContents =~ s/(?<!\w)Number(?!\w)/number/g;
