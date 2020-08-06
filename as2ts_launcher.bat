@@ -8,8 +8,8 @@ title asÅúÁ¿×ªts@teppei
 
 type readme.txt
 
-set launcher_srcPath="F:\mtj"
-set lauucher_outPath="E:\FYMClient\branches\mtjts"
+set launcher_srcPath="E:\qhgame\trunk\project\src"
+set lauucher_outPath="E:\qhgame\tsproj\src"
 
 perl as2ts.pl %launcher_srcPath% %lauucher_outPath%
 
