@@ -256,12 +256,17 @@ sub scanFile
 			} else {
 				my @importArr = split(/\./, $var_1);
 				my $importedClassName = $importArr[scalar(@importArr) - 1];
-				$importedMap{$importedClassName} = 1;
-				if($var_1 =~ /^laya./) {
-					$line = "import $importedClassName = Laya.$importedClassName;\n";
+				if(exists $importedMap{$importedClassName}) {
+					# 已经import过了
+					$line = "\n";
 				} else {
-					# Dictionary等不需要import
-					$line = "import {$importedClassName} from '".join('/', @importArr)."\'\n";
+					$importedMap{$importedClassName} = 1;
+					if($var_1 =~ /^laya./) {
+						$line = "import $importedClassName = Laya.$importedClassName;\n";
+					} else {
+						# Dictionary等不需要import
+						$line = "import {$importedClassName} from '".join('/', @importArr)."\'\n";
+					}
 				}	      
 			}            
 		} elsif($line =~ s/(?:public )?(?:final )?class (\w+)/export class $1/) {
@@ -490,7 +495,6 @@ sub scanFile
 				$var_s1 = $1;
 				$var_s2 = $2;
 				$var_s3 = $3;
-				print("$i: local var: $varUnit, $var_s1, $var_s2, $var_s3\n");
 
 				$varStr.=$var_s1;
 				my $tmpTsType = '';
@@ -578,7 +582,7 @@ sub scanFile
   	
 		# 再处理成员函数
 		foreach my $otherFuncKey (keys %funcMap) {  
-			next if($otherFuncKey eq $funcKey);
+			# next if($otherFuncKey eq $funcKey);
 			# 按照类名+函数名解开
 			$otherFuncKey =~ /([^\+]+)\+(.*)/;  
 			my $otherFuncClass = $1;
