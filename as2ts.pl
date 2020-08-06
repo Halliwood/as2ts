@@ -575,7 +575,7 @@ sub scanFile
 
 			for($i = $funcStart + 1; $i <= $funcEnd; $i++) {
 				$funcLine = $tsContents[$i];
-				$funcLine =~ s/(?<![\.\w\d_])\Q$property\E(?!\w\d_)/$thisStr.$property/g;  # 除了 . 字母 数字 _ 开头的需要加上this，且后面不带 字母 数字 _
+				$funcLine =~ s/(?<![\.\w\d_])\Q$property\E(?=[\W])/$thisStr.$property/g;  # 除了 . 字母 数字 _ 开头的需要加上this，且后面不带 字母 数字 _
 				$tsContents[$i] = $funcLine;
 			}
 		}
@@ -634,6 +634,9 @@ sub scanFile
 		$allTsContents =~ s/;/,/g;
     }
     
+	# 由于getter和setter现在scope重合在一起没有区分开，可能导致其中一个出现this.xxx的现象，处理一下
+	$allTsContents =~ s/(?!<\w)set this\.(?=\w+\()/set /g;
+	$allTsContents =~ s/(?!<\w)get this\.(?=\w+\()/get /g;
     # 去掉__JS__()
     $allTsContents =~ s/__JS__\(['|"](.+)['|"]\)/$1/g;
 	
@@ -727,7 +730,11 @@ sub asInit2tsInit
 	my $tsInit = $asInit;
 	($tsInit =~ s/new <\S+>//) or ($tsInit =~ s/new Vector\./new Array/) or ($tsInit =~ s/new Dictionary\((true|false)?\)/{}/);
 	if($tsInit =~ /(.*)new (\S+)\(\)(.*)/) {
-		$tsInit = $1.'new '.asType2tsType($2).'()'.$3;
+		if($2 eq 'Array') {
+			$tsInit = $1.'[]';
+		} else {
+			$tsInit = $1.'new '.asType2tsType($2).'()'.$3;
+		}
 	}
 	return $tsInit;
 }
