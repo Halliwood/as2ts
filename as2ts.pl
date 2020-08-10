@@ -161,7 +161,7 @@ sub checkSkipDir
 sub checkSkipFile
 {
 	my $input=shift;
-	return ($input !~ /CachingModel\.as/ || $input =~ /DecodeUtil\.as/ || $input =~ /EncodeUtil\.as/);
+	return ($input !~ /ActivityData\.as/ || $input =~ /DecodeUtil\.as/ || $input =~ /EncodeUtil\.as/);
 }
 
 ##
@@ -205,6 +205,7 @@ sub scanFile
 	my $inFunc = 0;  # 是否在函数体内
 	my $inFuncName;  # 当前在哪个函数体内
 	my %funcScopeMap = ();  # 记录[成员函数 - (起始行，终止行)]
+	my $isParamsComplete = 1;
     my $isEnum = 1;
 	
 	my @protocolStructs = ();  # 记录协议结构
@@ -309,7 +310,7 @@ sub scanFile
 				$isEnum = 0;
 			}
 
-		} elsif($line =~ /\s*(public |protected |private )(static )?(const |var )(\w+)(.*)/g) {
+		} elsif($line =~ /\s*(public |protected |private )(static )?(const |var )\s?(\w+)(.*)/g) {
 			# 转换成员变量声明
 			$inFunc = 0;
 
@@ -365,7 +366,7 @@ sub scanFile
 				$line.=$var_6;
 			}
 			$line.="\n";
-		} elsif($line =~ /(.*)(?:static |override )?(public |protected |private )(static |override )?function ([^\(]+)\(([^\)]*)\)?(?:\s?:\s?([^\s\{]+))?(.*)/) {
+		} elsif($line =~ /(.*)(?:static |override )?(public |protected |private )(static |override )?function ([^\(]+)\(([^\)]*\)?)(?:\s?:\s?([^\s\{]+))?(.*)/) {
 			# 转换成员函数
 			$inFunc = 1;
 
@@ -423,36 +424,41 @@ sub scanFile
 				$line.='constructor(';
 			}
 
+			$isParamsComplete = 1;
 			if('' ne $var_5) {
-				# 转换参数列表
-				my $funcParamStr = '';
-				my @funcParamsArr = split(/\s?,\s?/, $var_5);
-				foreach my $funcParamUnit (@funcParamsArr) {
-					if('' ne $funcParamStr) {
-						$funcParamStr.=', ';
-					}
-					my @paramUnitArr = split(/\s?[\:=]\s?/, $funcParamUnit);
-					my $paramUnitLen = scalar(@paramUnitArr);
-					$funcParamStr.=$paramUnitArr[0];
-					push @funcParamNameArr, $paramUnitArr[0];
-					if($paramUnitLen > 1) {
-						# 有类型
-						$funcParamStr.=': '.asType2tsType($paramUnitArr[1]);
-						if($paramUnitLen > 2) {
-							# 有默认参数
-							$funcParamStr.=' = '.$paramUnitArr[2];
-						}
-					}          
+				# 可能换行
+				if($var_5 !~ s/\)$//) {
+					$isParamsComplete = 0;
 				}
-				$line.=$funcParamStr;
+				# 转换参数列表
+				$line = processFuncParams($var_5, $line);
 			}
-			$line.=')';
-			if(2 != $getterSetter && defined $var_6 && '' ne $var_6 && 'constructor' ne $funcName) {
+			if($isParamsComplete == 1) {
+				$line.=')';
+			}
+			if(2 != $getterSetter && defined $var_6 && '' ne $var_6 && 'constructor' ne $inFuncName) {
 				$line.=': '.asType2tsType($var_6);
 			}      
 			$line.=$var_7."\n";
 
 			$funcMap{$funcKey} = [@funcParamNameArr]; # 保存成员函数信息
+		} elsif($inFunc == 1 && $isParamsComplete == 0 && $line=~/(\s*),?([^\)]*\)?)(?:\s?:\s?([^\s\{]+))?(.*)/) {
+			$var_1 = $1; # 先保存匹配变量，防止下面执行正则时被改
+			$var_2 = $2;
+			$var_3 = $3;
+			$var_4 = $4;
+
+			if($var_2 =~ s/\)$//) {
+				$isParamsComplete = 1;
+			}
+			$line = $var_1.', '.processFuncParams($var_2, '');
+			if($isParamsComplete == 1) {
+				$line.=')';
+				if(defined $var_3 && '' ne $var_3 && 'constructor' ne $inFuncName) {
+					$line.=': '.asType2tsType($var_3);
+				}      
+				$line.=$var_4."\n";
+			}
 		} elsif($line =~ /(.*)(?<=[\s\(;])var ([^;]+)(.*)/) {
 			# 转换局部变量
 			$var_1 = $1; # 先保存匹配变量，防止下面执行正则时被改
@@ -689,7 +695,7 @@ sub scanFile
 
 	# 补上this
 	$allTsContents =~ s/Handler\.create\(this,\s?(?!this)/Handler.create(this, this./g;
-	$allTsContents =~ s/on\(Event\.(\w+),\s?this,\s?(?!this)/on(Event.$1, this, this./g;
+	$allTsContents =~ s/on\(Event\.(\w+),\s?this,(?!\s?this)/on(Event.$1, this, this./g;
 	$allTsContents =~ s/loop\((\w+),\s?this,\s?(?!this)/loop($1, this, this./g;
 	
 	# 协议发送
@@ -780,6 +786,33 @@ sub scanFile
 	#print "ts content = $allTsContents\n";
 }
 
+sub processFuncParams
+{
+	my ($inParamStr, $line) = @_;
+	# 转换参数列表
+	my $funcParamStr = '';
+	my @funcParamsArr = split(/\s?,\s?/, $inParamStr);
+	foreach my $funcParamUnit (@funcParamsArr) {
+		if('' ne $funcParamStr) {
+			$funcParamStr.=', ';
+		}
+		my @paramUnitArr = split(/\s?[\:=]\s?/, $funcParamUnit);
+		my $paramUnitLen = scalar(@paramUnitArr);
+		$funcParamStr.=$paramUnitArr[0];
+		push @funcParamNameArr, $paramUnitArr[0];
+		if($paramUnitLen > 1) {
+			# 有类型
+			$funcParamStr.=': '.asType2tsType($paramUnitArr[1]);
+			if($paramUnitLen > 2) {
+				# 有默认参数
+				$funcParamStr.=' = '.$paramUnitArr[2];
+			}
+		}          
+	}
+	$line.=$funcParamStr;
+	return $line;
+}
+
 ##
 # as初始化转换为ts初始化
 ##
@@ -796,7 +829,7 @@ sub asInit2tsInit
 		}
 	}
 	# 去掉as xxx
-	$tsInit =~ s/ as (\S+)//g;
+	$tsInit =~ s/ as [\w|\.|<|>]+//g;
 	return $tsInit;
 }
 
