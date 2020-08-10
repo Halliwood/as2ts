@@ -152,7 +152,7 @@ sub scanRecuisively
 sub checkSkipDir
 {
 	my $input=shift;
-	return ($input =~ /^ui/ || $input =~ /^automatic/);
+	return ($input =~ /^ui\// || $input =~ /^automatic/);
 }
 
 ##
@@ -161,7 +161,7 @@ sub checkSkipDir
 sub checkSkipFile
 {
 	my $input=shift;
-	return ($input !~ /\.as/ || $input =~ /DecodeUtil\.as/ || $input =~ /EncodeUtil\.as/);
+	return ($input !~ /CachingModel\.as/ || $input =~ /DecodeUtil\.as/ || $input =~ /EncodeUtil\.as/);
 }
 
 ##
@@ -218,6 +218,8 @@ sub scanFile
 		# 跳过package，这里不考虑内部类的情况
 		#next ;
 		$line = $contents[$i];
+		# 去掉末尾的两个;;的情况
+		$line =~ s/;{2,}(\s*)$/;$1/;
 
 		if($line =~ /^\s*\/\// || $line =~/^\s*\/\*\*/ || $line =~ /^\s*\*/) {
 		# 注释掉的不管
@@ -233,14 +235,14 @@ sub scanFile
 			# 紧跟package的花括号
 			$packageBraceFlag = 2;  # 剩下右花括号
 			$line = '';
-		} elsif($line =~ /\s*import (\S+);/) {
+		} elsif($line =~ /\s*import\s+(\S+)\s?;/) {
 			# 转换import
 			$inFunc = 0;
 
 			$var_1 = $1; # 先保存匹配变量，防止下面执行正则时被改
 
 			# 先把用到的协议结构记录下来
-			if($var_1 =~ /^automatic\.protocol\.(\S+)$/ && 'Macros' ne $1 && 'DecodeUtil' ne $1 && 'EncodeUtil' ne $1 && '*' ne $1) {
+			if($var_1 =~ /^automatic\.protocol\.(\S+)$/ && 'Macros' ne $1 && 'ErrorId' ne $1 && 'DecodeUtil' ne $1 && 'EncodeUtil' ne $1 && '*' ne $1) {
 				push @protocolStructs, $1;
 			}
 			# 把用到表格结构也记录下来
@@ -304,6 +306,7 @@ sub scanFile
 			$classScopeMap{$className} = [@classScopeArr];
 			if($line =~ / extends /) {
 				$hasParent = 1;
+				$isEnum = 0;
 			}
 
 		} elsif($line =~ /\s*(public |protected |private )(static )?(const |var )(\w+)(.*)/g) {
@@ -350,7 +353,7 @@ sub scanFile
 				$line.=': '.$memberTsType;
 			}
 			# 翻译初始化
-			if($var_6 !~ /\s*=\s*['|"]/ and $var_6 =~ /\s*=\s*([^;]*)/) {
+			if($var_6 !~ /\s*=\s*['|"]/ and $var_6 =~ /\s*=\s*(.+);+/) {
 				$line.=' = '.asInit2tsInit($1).';';
 			} else {
 				# number类型自动初始化为0
@@ -362,24 +365,25 @@ sub scanFile
 				$line.=$var_6;
 			}
 			$line.="\n";
-		} elsif($line =~ /\s*(public|protected|private)( static| override)? function ([^\(]+)\(([^\)]*)\)(?:\s?:\s?([^\s\{]+))?(.*)/) {
+		} elsif($line =~ /(.*)(?:static |override )?(public |protected |private )(static |override )?function ([^\(]+)\(([^\)]*)\)?(?:\s?:\s?([^\s\{]+))?(.*)/) {
 			# 转换成员函数
 			$inFunc = 1;
 
 			$var_1 = $1; # 先保存匹配变量，防止下面执行正则时被改
-			$var_2 = $2;
+            $var_2 = $2;
 			$var_3 = $3;
 			$var_4 = $4;
 			$var_5 = $5;
 			$var_6 = $6;
+			$var_7 = $7;
 
 			# 检查是否getter/setter
 			my @funcParamNameArr = ();
 			my $getterSetter = 0;  # 1是getter，2是setter
-			if(defined $className && $className eq $var_3) {
+			if(defined $className && $className eq $var_4) {
 				# 这是构造函数，名字改成constructor
 				$funcName = 'constructor';
-			} elsif($var_3 =~ /(get|set) (.*)/) {
+			} elsif($var_4 =~ /(get|set) (.*)/) {
 				# getter/setter
 				$getterSetter = 'get' eq $1 ? 1 : 2;
 				$funcName = $2;
@@ -387,7 +391,7 @@ sub scanFile
 				# 当成属性处理，这样后面会加上this
 				$propertiesMap{$className.'+'.$funcName} = 1;
 			} else {
-				$funcName = $var_3;
+				$funcName = $var_4;
 				$isEnum = 0;
 			}
 
@@ -405,21 +409,24 @@ sub scanFile
 			}
 			$funcKey = (defined $className ? $className : '').'+'.$funcName;
 
+            # 有的函数结尾右括号没有换行，紧接着下一个函数
+			$var_1 =~ s/override\s+//;
+			$line = $var_1;
 			if('constructor' ne $funcName) {
-				$line = 'public' eq $var_1 ? '' : $var_1;
-				if(defined $var_2 && ' static' eq $var_2){
-					$line.=' static';
+				$line.='public ' eq $var_2 ? '' : $var_2;
+				if(defined $var_3 && 'static ' eq $var_3){
+					$line.='static ';
 					$staticFuncMap{$funcKey} = 1;  # 标记为静态函数
 				}
-				$line.=' '.$var_3.'(';
+				$line.=$var_4.'(';
 			} else {
-				$line = 'constructor(';
+				$line.='constructor(';
 			}
 
-			if('' ne $var_4) {
+			if('' ne $var_5) {
 				# 转换参数列表
 				my $funcParamStr = '';
-				my @funcParamsArr = split(/\s?,\s?/, $var_4);
+				my @funcParamsArr = split(/\s?,\s?/, $var_5);
 				foreach my $funcParamUnit (@funcParamsArr) {
 					if('' ne $funcParamStr) {
 						$funcParamStr.=', ';
@@ -440,10 +447,10 @@ sub scanFile
 				$line.=$funcParamStr;
 			}
 			$line.=')';
-			if(2 != $getterSetter && defined $var_5 && '' ne $var_5) {
-				$line.=': '.asType2tsType($var_5);
+			if(2 != $getterSetter && defined $var_6 && '' ne $var_6 && 'constructor' ne $funcName) {
+				$line.=': '.asType2tsType($var_6);
 			}      
-			$line.=$var_6."\n";
+			$line.=$var_7."\n";
 
 			$funcMap{$funcKey} = [@funcParamNameArr]; # 保存成员函数信息
 		} elsif($line =~ /(.*)(?<=[\s\(;])var ([^;]+)(.*)/) {
@@ -679,6 +686,11 @@ sub scanFile
 	
 	# for in去掉类型声明
 	$allTsContents =~ s/for\s?\(\s?let ([^:\s]+)\s?:\s?[\S+] in/for (let $1 in/g;
+
+	# 补上this
+	$allTsContents =~ s/Handler\.create\(this,\s?(?!this)/Handler.create(this, this./g;
+	$allTsContents =~ s/on\(Event\.(\w+),\s?this,\s?(?!this)/on(Event.$1, this, this./g;
+	$allTsContents =~ s/loop\((\w+),\s?this,\s?(?!this)/loop($1, this, this./g;
 	
 	# 协议发送
 	$allTsContents =~ s/m_netModule(?=\.sendMsg)/G.ModuleMgr.netModule/g;
@@ -696,9 +708,15 @@ sub scanFile
 	# FyMsg改成Protocol.FyMsg
 	$allTsContents =~ s/(?<![\.\w])FyMsg/Protocol.FyMsg/g;
 
+	# 修复可能出现let this.xxx的情况
+	$allTsContents =~ s/(?<=let )this\.//g;
+
 	# 去掉as
 	# $allTsContents =~ s/ as Array(?!\w)//g;
 	$allTsContents =~ s/ as [\w|\.|<|>|\[|\]]+//g;
+
+	# is改instanceof
+	$allTsContents =~ s/if\s?\((\S+)\s+is\s+(\S+)\)/if($1 instanceof $2)/g;
 	
 	# 转换表格结构
 	foreach my $cfgStruct (@configStructs) {
@@ -713,6 +731,7 @@ sub scanFile
 
 	# Vector.<xx> 改 xx[]
 	$allTsContents =~ s/(?!<\w)Vector\./Array/g;
+	$allTsContents =~ s/new Array<([\w|\.]+)>;/new Array<$1>();/g;
 	
 	# Number 改 number
 	$allTsContents =~ s/(?<!\w)Number(?!\w)/number/g;
@@ -730,7 +749,7 @@ sub scanFile
 	$allTsContents =~ s/\/\*\*\s+\*\s?(\S+)\s+\*\//\/**$1*\//g;
 	
 	# 字符串替换成单引号
-	$allTsContents =~ s/(?<!\\)"([^"]*)(?<!\\)"/'$1'/g;  # "
+	# $allTsContents =~ s/(?<!\\)"([^"]*)(?<!\\)"/'$1'/g;  # "
 	
 	# 清理空构造函数
 	$allTsContents =~ s/constructor\(\)\s*\{\s+\}//g;
@@ -768,7 +787,7 @@ sub asInit2tsInit
 {
 	my $asInit = shift;
 	my $tsInit = $asInit;
-	($tsInit =~ s/new <\S+>//) or ($tsInit =~ s/new Vector\.<([\w|\.]+)>;\./new Array<$1>();/) or ($tsInit =~ s/new Vector\./new Array/) or ($tsInit =~ s/new Dictionary\((true|false)?\)/{}/);
+	($tsInit =~ s/new <\S+>//) or ($tsInit =~ s/new Vector\.<([\w|\.]+)>;/new Array<$1>();/) or ($tsInit =~ s/new Vector\./new Array/) or ($tsInit =~ s/new Dictionary\((true|false)?\)/{}/);
 	if($tsInit =~ /(.*)new (\S+)\(\)(.*)/) {
 		if($2 eq 'Array') {
 			$tsInit = $1.'[]';
@@ -776,6 +795,8 @@ sub asInit2tsInit
 			$tsInit = $1.'new '.asType2tsType($2).'()'.$3;
 		}
 	}
+	# 去掉as xxx
+	$tsInit =~ s/ as (\S+)//g;
 	return $tsInit;
 }
 
@@ -817,7 +838,7 @@ sub asType2tsType
 sub noImport
 {
 	my $import = shift;
-	return $import =~ /^automatic\.protocol\.(?!Macros)/;
+	return $import =~ /^automatic\.protocol\.(?!(Macros|Errorid))/;
 }
 
 ##
