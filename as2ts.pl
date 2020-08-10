@@ -161,7 +161,7 @@ sub checkSkipDir
 sub checkSkipFile
 {
 	my $input=shift;
-	return ($input !~ /ActivityData\.as/ || $input =~ /DecodeUtil\.as/ || $input =~ /EncodeUtil\.as/);
+	return ($input !~ /ZhufuData\.as/ || $input =~ /DecodeUtil\.as/ || $input =~ /EncodeUtil\.as/);
 }
 
 ##
@@ -379,7 +379,6 @@ sub scanFile
 			$var_7 = $7;
 
 			# 检查是否getter/setter
-			my @funcParamNameArr = ();
 			my $getterSetter = 0;  # 1是getter，2是setter
 			if(defined $className && $className eq $var_4) {
 				# 这是构造函数，名字改成constructor
@@ -404,11 +403,10 @@ sub scanFile
 					@$lastFuncScopeArr[1] = $i - 1;
 				}
 				$inFuncName = $funcName;
-				# 标记函数体起始行
-				my @funcScopeArr = ($i, $i);
-				$funcScopeMap{$funcName} = [@funcScopeArr];
 			}
 			$funcKey = (defined $className ? $className : '').'+'.$funcName;
+			my @funcParamNameArr = ();
+			$funcMap{$funcKey} = [@funcParamNameArr]; # 保存成员函数信息
 
             # 有的函数结尾右括号没有换行，紧接着下一个函数
 			$var_1 =~ s/override\s+//;
@@ -427,11 +425,15 @@ sub scanFile
 			$isParamsComplete = 1;
 			if('' ne $var_5) {
 				# 可能换行
-				if($var_5 !~ s/\)$//) {
+				if($var_5 =~ s/\)$//) {
+					# 标记函数体起始行
+					my @funcScopeArr = ($i, $i);
+					$funcScopeMap{$funcName} = [@funcScopeArr];
+				} else {
 					$isParamsComplete = 0;
 				}
 				# 转换参数列表
-				$line = processFuncParams($var_5, $line);
+				$line = processFuncParams($var_5, $funcMap{$funcKey}, $line);
 			}
 			if($isParamsComplete == 1) {
 				$line.=')';
@@ -440,9 +442,7 @@ sub scanFile
 				$line.=': '.asType2tsType($var_6);
 			}      
 			$line.=$var_7."\n";
-
-			$funcMap{$funcKey} = [@funcParamNameArr]; # 保存成员函数信息
-		} elsif($inFunc == 1 && $isParamsComplete == 0 && $line=~/(\s*),?([^\)]*\)?)(?:\s?:\s?([^\s\{]+))?(.*)/) {
+		} elsif($inFunc == 1 && $isParamsComplete == 0 && $line=~/(\s*,?\s*)([^\)]*\)?)(?:\s?:\s?([^\s\{]+))?(.*)/) {
 			$var_1 = $1; # 先保存匹配变量，防止下面执行正则时被改
 			$var_2 = $2;
 			$var_3 = $3;
@@ -450,8 +450,12 @@ sub scanFile
 
 			if($var_2 =~ s/\)$//) {
 				$isParamsComplete = 1;
+				# 标记函数体起始行
+				my @funcScopeArr = ($i, $i);
+				$funcScopeMap{$funcName} = [@funcScopeArr];
 			}
-			$line = $var_1.', '.processFuncParams($var_2, '');
+			my $funcParamNameArr = $funcMap{(defined $className ? $className : '').'+'.$inFuncName};
+			$line = $var_1.processFuncParams($var_2, $funcParamNameArr, '');
 			if($isParamsComplete == 1) {
 				$line.=')';
 				if(defined $var_3 && '' ne $var_3 && 'constructor' ne $inFuncName) {
@@ -687,11 +691,11 @@ sub scanFile
     $allTsContents =~ s/__JS__\(['|"](.+)['|"]\)/$1/g;
 	
 	# for each 换成 for of
-	$allTsContents =~ s/for each\s?\(\s?(?:var|let) (.+) in /for (let $1 of /g;
+	$allTsContents =~ s/for each\s?\(\s?(?:var|let) ([^:]+)(?::\s?[\w|\.|<|>]+)? in /for (let $1 of /g;
 	$allTsContents =~ s/for each\s?\(\s?([^:\s]+)(\s?:\s?[\S]+)? in /for ($1 of /g;
 	
 	# for in去掉类型声明
-	$allTsContents =~ s/for\s?\(\s?let ([^:\s]+)\s?:\s?[\S+] in/for (let $1 in/g;
+	$allTsContents =~ s/for\s?\(\s?let ([^:\s]+)\s?:\s?\S+ in/for (let $1 in/g;
 
 	# 补上this
 	$allTsContents =~ s/Handler\.create\(this,\s?(?!this)/Handler.create(this, this./g;
@@ -740,7 +744,7 @@ sub scanFile
 	$allTsContents =~ s/new Array<([\w|\.]+)>;/new Array<$1>();/g;
 	
 	# Number 改 number
-	$allTsContents =~ s/(?<!\w)Number(?!\w)/number/g;
+	$allTsContents =~ s/(?<!\w)Number(?![\w|\(])/number/g;
 	# String 改 string
 	$allTsContents =~ s/(?<!\w)String(?!\w)/string/g;
 	# Boolean 改 boolean
@@ -788,7 +792,7 @@ sub scanFile
 
 sub processFuncParams
 {
-	my ($inParamStr, $line) = @_;
+	my ($inParamStr, $funcParamNameArr, $line) = @_;
 	# 转换参数列表
 	my $funcParamStr = '';
 	my @funcParamsArr = split(/\s?,\s?/, $inParamStr);
@@ -799,7 +803,7 @@ sub processFuncParams
 		my @paramUnitArr = split(/\s?[\:=]\s?/, $funcParamUnit);
 		my $paramUnitLen = scalar(@paramUnitArr);
 		$funcParamStr.=$paramUnitArr[0];
-		push @funcParamNameArr, $paramUnitArr[0];
+		push @$funcParamNameArr, $paramUnitArr[0];
 		if($paramUnitLen > 1) {
 			# 有类型
 			$funcParamStr.=': '.asType2tsType($paramUnitArr[1]);
@@ -820,7 +824,11 @@ sub asInit2tsInit
 {
 	my $asInit = shift;
 	my $tsInit = $asInit;
-	($tsInit =~ s/new <\S+>//) or ($tsInit =~ s/new Vector\.<([\w|\.]+)>;/new Array<$1>();/) or ($tsInit =~ s/new Vector\./new Array/) or ($tsInit =~ s/new Dictionary\((true|false)?\)/{}/);
+	($tsInit =~ s/new <\S+>//) or 
+	($tsInit =~ s/new Vector\.<([\w|\.]+)>;/new Array<$1>();/) or 
+	($tsInit =~ s/new Vector\./new Array/) or 
+	($tsInit =~ s/new Dictionary\((true|false)?\)/{}/) or 
+	($tsInit =~ s/new Object\(\)/{}/);
 	if($tsInit =~ /(.*)new (\S+)\(\)(.*)/) {
 		if($2 eq 'Array') {
 			$tsInit = $1.'[]';
