@@ -161,7 +161,7 @@ sub checkSkipDir
 sub checkSkipFile
 {
 	my $input=shift;
-	return ($input !~ /IPoolObject.as/ || $input =~ /DecodeUtil\.as/ || $input =~ /EncodeUtil\.as/);
+	return ($input !~ /\.as/ || $input =~ /DecodeUtil\.as/ || $input =~ /EncodeUtil\.as/);
 }
 
 ##
@@ -192,6 +192,7 @@ sub scanFile
     my %importedMap = ();
 	my %classScopeMap = ();  # 可能一个文件里声明了多个类，记录[类名 - (起始行，终止行)]
 	my $className;
+	my $hasParent = 0;
 	my $var_1, my $var_2, my $var_3, my $var_4, my $var_5, my $var_6;
 	my $var_s1, my $var_s2, my $var_s3;
 	my $propertyKey;
@@ -218,7 +219,7 @@ sub scanFile
 		#next ;
 		$line = $contents[$i];
 
-		if($line =~ /^\/\// || $line =~/^\s*\/\*\*/ || $line =~ /^\s*\*/) {
+		if($line =~ /^\s*\/\// || $line =~/^\s*\/\*\*/ || $line =~ /^\s*\*/) {
 		# 注释掉的不管
 		} elsif($line =~ /^package/) {
 			# package去掉
@@ -239,7 +240,7 @@ sub scanFile
 			$var_1 = $1; # 先保存匹配变量，防止下面执行正则时被改
 
 			# 先把用到的协议结构记录下来
-			if($var_1 =~ /FyProtocol\.(\S+)$/ && 'Macros' ne $1 && 'TinyMacros' ne $1 && 'FyMSg' ne $1 && '*' ne $1) {
+			if($var_1 =~ /^automatic\.protocol\.(\S+)$/ && 'Macros' ne $1 && 'DecodeUtil' ne $1 && 'EncodeUtil' ne $1 && '*' ne $1) {
 				push @protocolStructs, $1;
 			}
 			# 把用到表格结构也记录下来
@@ -263,13 +264,15 @@ sub scanFile
 					$importedMap{$importedClassName} = 1;
 					if($var_1 =~ /^laya./) {
 						$line = "import $importedClassName = Laya.$importedClassName;\n";
+					} elsif($var_1 =~ /^ui./) {
+						$line = "import $importedClassName = ui.$importedClassName;\n";
 					} else {
 						# Dictionary等不需要import
 						$line = "import {$importedClassName} from '".join('/', @importArr)."\'\n";
 					}
 				}	      
 			}            
-		} elsif($line =~ s/(?:public )?(?:final )?(class |interface )(\w+)/export $1 $2/) {
+		} elsif($line =~ s/^\s*(?:public )?(?:final )?(class |interface )(\w+)/export $1 $2/) {
 			# 转换class声明
 			$inFunc = 0;
 
@@ -299,6 +302,9 @@ sub scanFile
 			$className = $var_2;
 			my @classScopeArr = ($i, $i);
 			$classScopeMap{$className} = [@classScopeArr];
+			if($line =~ / extends /) {
+				$hasParent = 1;
+			}
 
 		} elsif($line =~ /\s*(public |protected |private )(static )?(const |var )(\w+)(.*)/g) {
 			# 转换成员变量声明
@@ -448,7 +454,7 @@ sub scanFile
 
 			$isEnum = 0;
 			my $varStr = '';
-			# 考虑一行声明多个变量的情形，如果以,分割变量实际上有bug，比如var a: int = Math.max(1, 0), b: int = 2; 
+			# 考虑一行声明多个变量的情形，如果以,分割变量实际上有bug，比如var a: int = Math.max(1, 0), b: int = 2; 或者var c = [1, 2, 3];
 			# 因此有一个简单的方法即检查括号是否匹配，否则可认定该,是用于参数分割，当然还是有个别特殊情形有问题，比如括号是用于字符串，但应该不常出现就不管了，因为大部分情况下括号是用于函数调用
 			my @tmpVarArr = split(/\s?,\s?/, $var_2);  
 			my $varUnit;
@@ -492,28 +498,48 @@ sub scanFile
 				if('' ne $varStr) {
 					$varStr.=', ';
 				}
-				$varUnit =~ /(\S+)\s?:?\s?([^\s=]*)(.*)/;
-				$var_s1 = $1;
-				$var_s2 = $2;
-				$var_s3 = $3;
+				# $varUnit =~ /(\w+)\s?:?\s?(\w*)(.*)/;
+				# $var_s1 = $1;
+				# $var_s2 = $2;
+				# $var_s3 = $3;
+				$var_s1 = '';
+				$var_s2 = '';
+				$var_s3 = '';
+
+				my $varDeclare = $varUnit;
+				my $assignPos = index($varUnit, '=');
+				if($assignPos > 0) {
+					$var_s3 = substr($varUnit, $assignPos + 1);
+					$varDeclare = substr($varUnit, 0, $assignPos);
+				}
+				my $typePos = index($varDeclare, ':');
+				if($typePos > 0) {
+					$var_s1 = substr($varDeclare, 0, $typePos);
+					$var_s2 = substr($varDeclare, $typePos + 1);
+				} else {
+					$var_s1 = $varDeclare;
+				}
 
 				$varStr.=$var_s1;
 				my $tmpTsType = '';
 				if('' ne $var_s2) {
 					# 有类型
+					$var_s2 = trim($var_s2);
 					$tmpTsType = asType2tsType($var_s2);
 					$varStr.=': '.$tmpTsType;
 				}
-				if('' ne $var_s3 && $var_s3 =~ /^\s*=/) {
+				if('' ne $var_s3) {
 					# 有初始化
-					$var_s3 =~ s/^\s*=\s*//;
+					$var_s3 = trim($var_s3);
 					$varStr.=' = '.asInit2tsInit($var_s3);
-				} elsif($tmpTsType) {
-					# number类型自动初始化为0
-					if('number' ne $var_s2 && 'number' eq $tmpTsType) {
-						$varStr.=' = 0';
-					} elsif('boolean' ne $var_s2 && 'boolean' eq $tmpTsType) {
-						$varStr.=' = false';
+				} else{
+					if($tmpTsType) {
+						# number类型自动初始化为0
+						if('number' ne $var_s2 && 'number' eq $tmpTsType) {
+							$varStr.=' = 0';
+						} elsif('boolean' ne $var_s2 && 'boolean' eq $tmpTsType) {
+							$varStr.=' = false';
+						}
 					}
 					$varStr.=$var_s3;
 				}
@@ -626,6 +652,9 @@ sub scanFile
 			$allTsContents = "import {$parentClass} from '$importParentPath'\n".$allTsContents;
 		}
     }
+
+	# 检查import Global
+
     
     # 枚举类class改成enum
     if($isEnum) {
@@ -645,7 +674,7 @@ sub scanFile
     $allTsContents =~ s/__JS__\(['|"](.+)['|"]\)/$1/g;
 	
 	# for each 换成 for of
-	$allTsContents =~ s/for each\s?\(\s?(?:var|let) ([^:\s]+)(\s?:\s?[\S]+)? in /for (let $1 of /g;
+	$allTsContents =~ s/for each\s?\(\s?(?:var|let) (.+) in /for (let $1 of /g;
 	$allTsContents =~ s/for each\s?\(\s?([^:\s]+)(\s?:\s?[\S]+)? in /for ($1 of /g;
 	
 	# for in去掉类型声明
@@ -666,6 +695,10 @@ sub scanFile
 	$allTsContents =~ s/msg\s?:\s?FyMsg(?=\))/body: Protocol.XXX/g;
 	# FyMsg改成Protocol.FyMsg
 	$allTsContents =~ s/(?<![\.\w])FyMsg/Protocol.FyMsg/g;
+
+	# 去掉as
+	# $allTsContents =~ s/ as Array(?!\w)//g;
+	$allTsContents =~ s/ as [\w|\.|<|>|\[|\]]+//g;
 	
 	# 转换表格结构
 	foreach my $cfgStruct (@configStructs) {
@@ -677,6 +710,9 @@ sub scanFile
 
 	# trace 改 console.log
 	$allTsContents =~ s/(?<![\w\.])trace(?=\()/console.log/g;
+
+	# Vector.<xx> 改 xx[]
+	$allTsContents =~ s/(?!<\w)Vector\./Array/g;
 	
 	# Number 改 number
 	$allTsContents =~ s/(?<!\w)Number(?!\w)/number/g;
@@ -732,7 +768,7 @@ sub asInit2tsInit
 {
 	my $asInit = shift;
 	my $tsInit = $asInit;
-	($tsInit =~ s/new <\S+>//) or ($tsInit =~ s/new Vector\./new Array/) or ($tsInit =~ s/new Dictionary\((true|false)?\)/{}/);
+	($tsInit =~ s/new <\S+>//) or ($tsInit =~ s/new Vector\.<([\w|\.]+)>;\./new Array<$1>();/) or ($tsInit =~ s/new Vector\./new Array/) or ($tsInit =~ s/new Dictionary\((true|false)?\)/{}/);
 	if($tsInit =~ /(.*)new (\S+)\(\)(.*)/) {
 		if($2 eq 'Array') {
 			$tsInit = $1.'[]';
@@ -781,7 +817,7 @@ sub asType2tsType
 sub noImport
 {
 	my $import = shift;
-	return 0;
+	return $import =~ /^automatic\.protocol\.(?!Macros)/;
 }
 
 ##
@@ -796,4 +832,12 @@ sub countStr
 		$count++;
 	}
 	return $count;
+}
+
+sub trim
+{
+	my $inputStr = shift;
+	$inputStr =~ s/^ +//;
+	$inputStr =~ s/ +$//;
+	return $inputStr;
 }
