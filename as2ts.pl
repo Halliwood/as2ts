@@ -161,7 +161,7 @@ sub checkSkipDir
 sub checkSkipFile
 {
 	my $input=shift;
-	return ($input !~ /ZhufuData\.as/ || $input =~ /DecodeUtil\.as/ || $input =~ /EncodeUtil\.as/);
+	return ($input !~ /ProtocolUtil\.as/ || $input =~ /MsgPool\.as/ || $input =~ /FyMsg\.as/ || $input =~ /DecodeUtil\.as/ || $input =~ /EncodeUtil\.as/);
 }
 
 ##
@@ -247,11 +247,9 @@ sub scanFile
 				push @protocolStructs, $1;
 			}
 			# 把用到表格结构也记录下来
-			if($var_1 =~ /xmlData\.(\S+)$/) {
-				my $var_s1 = $1;
-				if('*' ne $var_s1) {
-					$var_s1 =~ s/_Flash$/M/;
-					push @configStructs, $var_s1;
+			if($var_1 =~ /^automatic\.cfgs\.(\S+)$/) {
+				if('*' ne $1) {
+					push @configStructs, $1;
 				}	      
 			}
 
@@ -275,7 +273,7 @@ sub scanFile
 					}
 				}	      
 			}            
-		} elsif($line =~ s/^\s*(?:public )?(?:final )?(class |interface )(\w+)/export $1 $2/) {
+		} elsif($line =~ s/^\s*(?:public )?(?:final )?(class |interface )\s*(\w+)/export $1 $2/) {
 			# 转换class声明
 			$inFunc = 0;
 
@@ -340,7 +338,7 @@ sub scanFile
 			$line = 'public ' eq $var_1 ? '' : $var_1;
 			$propertyKey = $className.'+'.$var_4;
 			if(defined $var_2 && 'static ' eq $var_2){
-				$line.=' static';
+				$line.='static ';
 				$propertiesMap{$propertyKey} = 2;
 			} else {
 				$propertiesMap{$propertyKey} = 1;
@@ -349,7 +347,7 @@ sub scanFile
 			if($memberTsType ne 'number') {
 				$isEnum = 0;
 			}
-			$line.=' '.$var_4;
+			$line.=$var_4;
 			if('' ne $memberTsType) {
 				$line.=': '.$memberTsType;
 			}
@@ -369,6 +367,7 @@ sub scanFile
 		} elsif($line =~ /(.*)(?:static |override )?(public |protected |private )(static |override )?function ([^\(]+)\(([^\)]*\)?)(?:\s?:\s?([^\s\{]+))?(.*)/) {
 			# 转换成员函数
 			$inFunc = 1;
+			$isEnum = 0;
 
 			$var_1 = $1; # 先保存匹配变量，防止下面执行正则时被改
             $var_2 = $2;
@@ -387,12 +386,10 @@ sub scanFile
 				# getter/setter
 				$getterSetter = 'get' eq $1 ? 1 : 2;
 				$funcName = $2;
-				$isEnum = 0;
 				# 当成属性处理，这样后面会加上this
 				$propertiesMap{$className.'+'.$funcName} = 1;
 			} else {
 				$funcName = $var_4;
-				$isEnum = 0;
 			}
 
 			# 标记进入函数体
@@ -713,6 +710,10 @@ sub scanFile
 		$allTsContents =~ s/(?<![\.\w])\Q$pstruct\E(?![\w_])/Protocol.$pstruct/g;
 	}
 	
+	if($allTsContents =~ s/MsgPool\.instance\.GetEncodeMsg\(Macros\.MsgID_(\w+)\)/SendMsgUtil.get$1()/g) {
+		$allTsContents = "import {SendMsgUtil} from 'automatic/protocol/SendMsgUtil'\n".$allTsContents;
+	}
+	
 	# FyMsg一般是在协议响应函数里，因为ts里面使用body作为参数了，不好脚本转换，改成XXX方便手工转换
 	$allTsContents =~ s/msg\s?:\s?FyMsg(?=\))/body: Protocol.XXX/g;
 	# FyMsg改成Protocol.FyMsg
@@ -749,6 +750,9 @@ sub scanFile
 	$allTsContents =~ s/(?<!\w)String(?!\w)/string/g;
 	# Boolean 改 boolean
 	$allTsContents =~ s/(?<!\w)String(?!\w)/string/g;
+
+	# KW改KeyWord
+	$allTsContents =~ s/(?<!\w)KW(?!\w)/KeyWord/g;
 	
 	# 针对枚举
 	if($file =~ /Enum\w+\.as$/) {
@@ -879,7 +883,7 @@ sub asType2tsType
 sub noImport
 {
 	my $import = shift;
-	return $import =~ /^automatic\.protocol\.(?!(Macros|Errorid))/;
+	return $import =~ /^automatic\.protocol\.(?!(Macros|Errorid))/ || $import =~ /^automatic\.cfgs\./ || $import =~ /MsgPool$/;
 }
 
 ##
