@@ -161,7 +161,7 @@ sub checkSkipDir
 sub checkSkipFile
 {
 	my $input=shift;
-	return ($input !~ /ProtocolUtil\.as/ || $input =~ /MsgPool\.as/ || $input =~ /FyMsg\.as/ || $input =~ /DecodeUtil\.as/ || $input =~ /EncodeUtil\.as/);
+	return ($input !~ /\.as/ || $input =~ /MsgPool\.as/ || $input =~ /FyMsg\.as/ || $input =~ /DecodeUtil\.as/ || $input =~ /EncodeUtil\.as/);
 }
 
 ##
@@ -308,7 +308,7 @@ sub scanFile
 				$isEnum = 0;
 			}
 
-		} elsif($line =~ /\s*(public |protected |private )(static )?(const |var )\s?(\w+)(.*)/g) {
+		} elsif($line =~ /\s*(public|protected|private)\s+(static )?(const |var )\s?(\w+)(.*)/g) {
 			# 转换成员变量声明
 			$inFunc = 0;
 
@@ -335,7 +335,7 @@ sub scanFile
 				undef $inFuncName;
 			}
 
-			$line = 'public ' eq $var_1 ? '' : $var_1;
+			$line = 'public' eq $var_1 ? '' : $var_1.' ';
 			$propertyKey = $className.'+'.$var_4;
 			if(defined $var_2 && 'static ' eq $var_2){
 				$line.='static ';
@@ -424,7 +424,7 @@ sub scanFile
 				# 可能换行
 				if($var_5 =~ s/\)$//) {
 					# 标记函数体起始行
-					my @funcScopeArr = ($i, $i);
+					my @funcScopeArr = ($i, -1);
 					$funcScopeMap{$funcName} = [@funcScopeArr];
 				} else {
 					$isParamsComplete = 0;
@@ -439,6 +439,10 @@ sub scanFile
 				$line.=': '.asType2tsType($var_6);
 			}      
 			$line.=$var_7."\n";
+			if($var_7 =~ /^\{.*\}$/) {
+				# 单行函数
+				print("single line func: $inFuncName\n");
+			}
 		} elsif($inFunc == 1 && $isParamsComplete == 0 && $line=~/(\s*,?\s*)([^\)]*\)?)(?:\s?:\s?([^\s\{]+))?(.*)/) {
 			$var_1 = $1; # 先保存匹配变量，防止下面执行正则时被改
 			$var_2 = $2;
@@ -448,7 +452,7 @@ sub scanFile
 			if($var_2 =~ s/\)$//) {
 				$isParamsComplete = 1;
 				# 标记函数体起始行
-				my @funcScopeArr = ($i, $i);
+				my @funcScopeArr = ($i, -1);
 				$funcScopeMap{$funcName} = [@funcScopeArr];
 			}
 			my $funcParamNameArr = $funcMap{(defined $className ? $className : '').'+'.$inFuncName};
@@ -586,7 +590,7 @@ sub scanFile
 		my $funcScopeArr = $funcScopeMap{$funcName};
 		my $funcStart = @$funcScopeArr[0];
 		my $funcEnd = @$funcScopeArr[1];
-		if($funcEnd == $funcStart) {
+		if($funcEnd == -1) {
 			$funcEnd = $totalLineNum - 1;
 		}
 
@@ -667,6 +671,11 @@ sub scanFile
 		}
     }
 
+	# 有父类的构造函数必须super
+	if($hasParent == 1) {
+		$allTsContents =~ s/constructor\(([^\)]*)\)([^\{]*)\{(?!\s*super\()/constructor($1)$2\nsuper();\n/;
+	}
+
 	# 检查import Global
 
     
@@ -688,16 +697,16 @@ sub scanFile
     $allTsContents =~ s/__JS__\(['|"](.+)['|"]\)/$1/g;
 	
 	# for each 换成 for of
-	$allTsContents =~ s/for each\s?\(\s?(?:var|let) ([^:]+)(?::\s?[\w|\.|<|>]+)? in /for (let $1 of /g;
+	$allTsContents =~ s/for each\s?\(\s?(?:var|let)\s+([^:]+)(?::\s?[\w|\.|<|>]+)?\s+in /for (let $1 of /g;
 	$allTsContents =~ s/for each\s?\(\s?([^:\s]+)(\s?:\s?[\S]+)? in /for ($1 of /g;
 	
 	# for in去掉类型声明
 	$allTsContents =~ s/for\s?\(\s?let ([^:\s]+)\s?:\s?\S+ in/for (let $1 in/g;
 
 	# 补上this
-	$allTsContents =~ s/Handler\.create\(this,\s?(?!this)/Handler.create(this, this./g;
-	$allTsContents =~ s/on\(Event\.(\w+),\s?this,(?!\s?this)/on(Event.$1, this, this./g;
-	$allTsContents =~ s/loop\((\w+),\s?this,\s?(?!this)/loop($1, this, this./g;
+	$allTsContents =~ s/Handler\.create\((\w+),\s?(?!(\1|function|\s))/Handler.create($1, $1./g;
+	$allTsContents =~ s/on\(Event\.(\w+),\s?this,(?!\s?(this|function))/on(Event.$1, this, this./g;
+	$allTsContents =~ s/loop\((\w+),\s?this,\s?(?!\s?(this|function))/loop($1, this, this./g;
 	
 	# 协议发送
 	$allTsContents =~ s/m_netModule(?=\.sendMsg)/G.ModuleMgr.netModule/g;
@@ -799,6 +808,9 @@ sub processFuncParams
 	my ($inParamStr, $funcParamNameArr, $line) = @_;
 	# 转换参数列表
 	my $funcParamStr = '';
+	if($inParamStr =~ /^\s*,/) {
+		$funcParamStr.=', ';
+	}
 	my @funcParamsArr = split(/\s?,\s?/, $inParamStr);
 	foreach my $funcParamUnit (@funcParamsArr) {
 		if('' ne $funcParamStr) {
@@ -816,6 +828,9 @@ sub processFuncParams
 				$funcParamStr.=' = '.$paramUnitArr[2];
 			}
 		}          
+	}
+	if($inParamStr =~ /,\s*$/) {
+		$funcParamStr.=', ';
 	}
 	$line.=$funcParamStr;
 	return $line;
