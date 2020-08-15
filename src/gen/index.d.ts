@@ -15,5 +15,13 @@ export interface As2TsOption {
     idReplacement?: {[raw: string]: string}, 
     literalReplacement?: {[raw: string]: string}, 
     typeMapper?: {[key: string]: string}, 
-    importRule?: As2TsImportRule
+    importRule?: As2TsImportRule, 
+    /**是否打印详细的错误信息 */
+    errorDetail?: boolean, 
+    /**是否在发生错误时立即终止 */
+    terminateWhenError?: boolean, 
+    /**是否从上次运行处继续翻译 */
+    continueLast?: boolean,
+    /**临时文件缓存目录 */
+    tmpRoot?: string
 }

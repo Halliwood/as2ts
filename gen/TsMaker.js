@@ -3,6 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.TsMaker = void 0;
 var typescript_estree_1 = require("@typescript-eslint/typescript-estree");
 var util = require("util");
+var path = require("path");
 var FunctionInfo = /** @class */ (function () {
     function FunctionInfo() {
         this.params = [];
@@ -129,10 +130,13 @@ var TsMaker = /** @class */ (function () {
         }
         return ast.__calPriority;
     };
-    TsMaker.prototype.make = function (ast, modulePath) {
+    TsMaker.prototype.make = function (ast, relativePath) {
         this.allTypes = [];
         this.importedMap = {};
+        this.relativePath = relativePath;
         var str = this.codeFromAST(ast);
+        var relativePP = path.parse(relativePath);
+        var modulePath = relativePP.dir.replace('\\', '/') + '/';
         for (var i = 0, len = this.allTypes.length; i < len; i++) {
             var type = this.allTypes[i];
             if (!this.importedMap[type] && !this.isSimpleType(type)) {
@@ -353,6 +357,9 @@ var TsMaker = /** @class */ (function () {
             case typescript_estree_1.AST_NODE_TYPES.TryStatement:
                 str += this.codeFromTryStatement(ast);
                 break;
+            case typescript_estree_1.AST_NODE_TYPES.TSClassImplements:
+                str += this.codeFromTSClassImplements(ast);
+                break;
             case typescript_estree_1.AST_NODE_TYPES.UnaryExpression:
                 str += this.codeFromUnaryExpression(ast);
                 break;
@@ -385,6 +392,12 @@ var TsMaker = /** @class */ (function () {
                 break;
             case typescript_estree_1.AST_NODE_TYPES.TSEnumDeclaration:
                 str += this.codeFromTSEnumDeclaration(ast);
+                break;
+            case typescript_estree_1.AST_NODE_TYPES.TSInterfaceBody:
+                str += this.codeFromTSInterfaceBody(ast);
+                break;
+            case typescript_estree_1.AST_NODE_TYPES.TSMethodSignature:
+                str += this.codeFromTSMethodSignature(ast);
                 break;
             case typescript_estree_1.AST_NODE_TYPES.TSModuleBlock:
                 str += this.codeFromTSModuleBlock(ast);
@@ -518,9 +531,12 @@ var TsMaker = /** @class */ (function () {
             }
             allAgmStr += argStr;
         }
-        str = calleeStr + '(';
-        str += allAgmStr;
-        str += ')';
+        if (calleeStr == '__JS__') {
+            str = allAgmStr.substr(1, allAgmStr.length - 2);
+        }
+        else {
+            str = calleeStr + '(' + allAgmStr + ')';
+        }
         return str;
     };
     TsMaker.prototype.codeFromCatchClause = function (ast) {
@@ -555,6 +571,7 @@ var TsMaker = /** @class */ (function () {
             this.assert(false, ast, 'Class name is necessary!');
         }
         var className = this.codeFromAST(ast.id);
+        this.importedMap[className] = true;
         this.crtClass = new ClassInfo();
         this.crtClass.name = className;
         var str = '';
@@ -567,8 +584,15 @@ var TsMaker = /** @class */ (function () {
             str += 'extends ' + this.codeFromAST(ast.superClass) + ' ';
         }
         if (ast.implements) {
-            ast.implements.__isType = true;
-            str += 'implements ' + this.codeFromAST(ast.implements) + ' ';
+            str += 'implements ';
+            for (var i = 0, len = ast.implements.length; i < len; i++) {
+                if (i > 0) {
+                    str += ', ';
+                }
+                ast.implements[i].__isType = true;
+                str += this.codeFromAST(ast.implements[i]);
+            }
+            str += ' ';
         }
         // if(ast.abstract) {
         //   // boolean;
@@ -720,6 +744,9 @@ var TsMaker = /** @class */ (function () {
         if (!funcName && ast.id) {
             funcName = this.codeFromAST(ast.id);
         }
+        if (!funcName) {
+            funcName = 'function';
+        }
         if (accessibility) {
             str += accessibility + ' ';
         }
@@ -730,14 +757,9 @@ var TsMaker = /** @class */ (function () {
             str += kind + ' ';
         }
         this.crtFunc = new FunctionInfo();
-        if (funcName) {
-            str += funcName + '(';
-            this.crtFunc.name = funcName;
-            this.crtClass.functionMap[funcName] = this.crtFunc;
-        }
-        else {
-            this.assert(false, ast, 'Not support anony function');
-        }
+        str += funcName + '(';
+        this.crtFunc.name = funcName;
+        this.crtClass.functionMap[funcName] = this.crtFunc;
         if (ast.params) {
             for (var i = 0, len = ast.params.length; i < len; i++) {
                 if (i > 0) {
@@ -756,6 +778,7 @@ var TsMaker = /** @class */ (function () {
         str += ' {\n';
         if (ast.body) {
             // 构造函数加上super
+            this.startAddThis = true;
             var bodyStr = this.codeFromAST(ast.body);
             if ('constructor' == funcName && bodyStr.indexOf('super(') < 0) {
                 if (bodyStr) {
@@ -765,6 +788,7 @@ var TsMaker = /** @class */ (function () {
                     bodyStr = 'super();';
                 }
             }
+            this.startAddThis = false;
             str += this.indent(bodyStr);
         }
         str += '\n}';
@@ -780,10 +804,10 @@ var TsMaker = /** @class */ (function () {
         if ('constructor' != str && this.option.idReplacement && this.option.idReplacement[str]) {
             str = this.option.idReplacement[str];
         }
-        if (ast.__isFuncParam) {
+        if (ast.__isFuncParam && this.crtFunc) {
             this.crtFunc.params.push(str);
         }
-        if ((!ast.__parent || ast.__parent.type != typescript_estree_1.AST_NODE_TYPES.MemberExpression) && null != this.crtClass && null != this.crtFunc) {
+        if (this.startAddThis && (!ast.__parent || ast.__parent.type != typescript_estree_1.AST_NODE_TYPES.MemberExpression) && null != this.crtClass && null != this.crtFunc) {
             if (this.crtFunc.params.indexOf(str) < 0 && (this.crtClass.functionMap[str] || this.crtClass.properties.indexOf(str) >= 0)) {
                 str = 'this.' + str;
             }
@@ -1031,7 +1055,7 @@ var TsMaker = /** @class */ (function () {
         var caseStr = '';
         for (var i = 0, len = ast.cases.length; i < len; i++) {
             if (i > 0) {
-                caseStr += ',\n';
+                caseStr += '\n';
             }
             caseStr += this.codeFromSwitchCase(ast.cases[i]);
         }
@@ -1070,6 +1094,14 @@ var TsMaker = /** @class */ (function () {
             str += '\n}';
         }
         str += '\n';
+        return str;
+    };
+    TsMaker.prototype.codeFromTSClassImplements = function (ast) {
+        var str = '';
+        str += this.codeFromAST(ast.expression);
+        if (ast.typeParameters) {
+            str += '<' + this.codeFromAST(ast.typeParameters) + '>';
+        }
         return str;
     };
     TsMaker.prototype.codeFromUnaryExpression = function (ast) {
@@ -1174,17 +1206,77 @@ var TsMaker = /** @class */ (function () {
         // this.assert(!ast.decorators, ast);
         // return '';
     };
+    TsMaker.prototype.codeFromTSInterfaceBody = function (ast) {
+        var str = '';
+        for (var i = 0, len = ast.body.length; i < len; i++) {
+            if (i > 0) {
+                str += '\n';
+            }
+            str += this.codeFromAST(ast.body[i]);
+        }
+        return str;
+    };
+    TsMaker.prototype.codeFromTSMethodSignature = function (ast) {
+        var str = '';
+        if (ast.accessibility) {
+            str += ast.accessibility + ' ';
+        }
+        if (ast.static) {
+            str += 'static ';
+        }
+        str += this.codeFromAST(ast.key) + '(';
+        if (ast.params) {
+            for (var i = 0, len = ast.params.length; i < len; i++) {
+                if (i > 0) {
+                    str += ', ';
+                }
+                var oneParam = ast.params[i];
+                oneParam.__parent = ast;
+                oneParam.__isFuncParam = true;
+                str += this.codeFromAST(oneParam);
+            }
+        }
+        str += ')';
+        if (ast.returnType) {
+            str += ': ' + this.codeFromAST(ast.returnType);
+        }
+        str += ';';
+        return str;
+    };
     TsMaker.prototype.codeFromTSModuleBlock = function (ast) {
-        this.assert(false, ast, 'Not support TSModuleBlock yet');
-        return '';
+        var str = '';
+        for (var i = 0, len = ast.body.length; i < len; i++) {
+            if (i > 0) {
+                str += '\n';
+            }
+            str += this.codeFromAST(ast.body[i]);
+        }
+        return str;
     };
     TsMaker.prototype.codeFromTSModuleDeclaration = function (ast) {
-        this.assert(false, ast, 'Not support TSModuleDeclaration yet');
+        if (ast.body) {
+            return this.codeFromAST(ast.body);
+        }
         return '';
     };
     TsMaker.prototype.codeFromTSInterfaceDeclaration = function (ast) {
-        this.assert(false, ast, 'Not support TSInterfaceDeclaration yet');
-        return '';
+        this.assert(!ast.implements, ast, 'not support implements yet!');
+        var str = 'export interface ';
+        str += this.codeFromAST(ast.id) + ' ';
+        if (ast.extends) {
+            str += 'extends ';
+            for (var i = 0, len = ast.extends.length; i < len; i++) {
+                if (i > 0) {
+                    str += ', ';
+                }
+                str += this.codeFromAST(ast.extends[i]);
+            }
+            str += ' ';
+        }
+        str += '{\n';
+        str += this.indent(this.codeFromAST(ast.body));
+        str += '\n}';
+        return str;
     };
     TsMaker.prototype.codeFromTSTypeAssertion = function (ast) {
         this.assert(false, ast, 'Not support TSTypeAssertion yet');
@@ -1192,6 +1284,8 @@ var TsMaker = /** @class */ (function () {
     };
     TsMaker.prototype.codeFromTSTypeAnnotation = function (ast) {
         var str = this.codeFromAST(ast.typeAnnotation);
+        if (str == 'Array')
+            str = 'any[]';
         return str;
     };
     TsMaker.prototype.codeFromTSTypeParameterInstantiation = function (ast) {
@@ -1249,10 +1343,13 @@ var TsMaker = /** @class */ (function () {
     TsMaker.prototype.assert = function (cond, ast, message) {
         if (message === void 0) { message = null; }
         if (!cond) {
-            // if (this.isDevMode) {
-            //     console.log(util.inspect(ast, true, 6));
-            // }
-            console.log('\x1B[36m%s\x1B[0m:\x1B[33m%d:%d\x1B[0m - \x1B[31merror\x1B[0m: %s', '[file]', ast.loc.start.line, ast.loc.start.column, message ? message : 'Error');
+            if (this.option.errorDetail) {
+                console.log(util.inspect(ast, true, 6));
+            }
+            console.log('\x1B[36m%s\x1B[0m(tmp/tmp.ts:\x1B[33m%d:%d\x1B[0m) - \x1B[31merror\x1B[0m: %s', this.relativePath, ast.loc.start.line, ast.loc.start.column, message ? message : 'Error');
+            if (this.option.terminateWhenError) {
+                throw new Error('[As2TS]Something wrong encountered.');
+            }
         }
     };
     return TsMaker;

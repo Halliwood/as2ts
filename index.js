@@ -30,7 +30,7 @@ var tsMaker;
 var optionExample = {
     skipRule: {
         "dirs": [/^ui\//, /^automatic/],
-        "files": [/ActHomeView\.as/, /MsgPool\.as/, /FyMsg\.as/, /DecodeUtil\.as/, /EncodeUtil\.as/]
+        "files": [/MsgPool\.as/, /FyMsg\.as/, /DecodeUtil\.as/, /EncodeUtil\.as/]
     },
     idReplacement: {
         "KW": "KeyWord"
@@ -50,16 +50,47 @@ var optionExample = {
         "fromModule": [
             { "module": "Laya", "regular": new RegExp("^laya") }
         ]
-    }
+    },
+    errorDetail: true,
+    terminateWhenError: true,
+    continueLast: false,
+    tmpRoot: 'tmp/'
 };
 var inputFolder;
 var outputFolder;
 var transOption;
+var lastConfPath;
+var tmpTsDir;
+var tmpAstDir;
+var continueLast;
+var meetLast;
 translateFiles('E:\\qhgame\\trunk\\project\\src\\', 'E:\\qhgame\\tsproj\\src\\', optionExample);
+/**不支持内联函数、函数语句、单行声明多个成员变量 */
 function translateFiles(inputPath, outputPath, option) {
     inputFolder = inputPath;
     outputFolder = outputPath;
-    transOption = option;
+    transOption = option || {};
+    if (transOption.tmpRoot) {
+        lastConfPath = transOption.tmpRoot + '/last.txt';
+        tmpTsDir = transOption.tmpRoot + '/ts/';
+        tmpAstDir = transOption.tmpRoot + '/ast/';
+        if (!fs.existsSync(tmpTsDir))
+            fs.mkdirSync(tmpTsDir, { recursive: true });
+        if (!fs.existsSync(tmpAstDir))
+            fs.mkdirSync(tmpAstDir, { recursive: true });
+    }
+    continueLast = false;
+    if (transOption.continueLast && transOption.tmpRoot && fs.existsSync(lastConfPath)) {
+        var lastConf = fs.readFileSync(lastConfPath, 'utf-8');
+        var lastConfArr = lastConf.split('|');
+        if (lastConfArr.length >= 3 && inputPath == lastConfArr[0] && outputPath == lastConfArr[1]) {
+            continueLast = true;
+            meetLast = lastConfArr[2];
+        }
+    }
+    if (transOption.continueLast && !continueLast) {
+        console.log('[WARN]No last configuration found: %s, the option "continueLast" won\'t work.', lastConfPath);
+    }
     if (!as2ts) {
         as2ts = new As2Ts_1.As2Ts();
         tsMaker = new TsMaker_1.TsMaker(option);
@@ -75,7 +106,7 @@ function translateFiles(inputPath, outputPath, option) {
 }
 exports.translateFiles = translateFiles;
 function readDir(dirPath) {
-    if (transOption && transOption.skipRule && transOption.skipRule.dirs) {
+    if (transOption.skipRule && transOption.skipRule.dirs) {
         var relativePath = path.relative(inputFolder, dirPath);
         for (var _i = 0, _a = transOption.skipRule.dirs; _i < _a.length; _i++) {
             var sd = _a[_i];
@@ -101,10 +132,10 @@ function readDir(dirPath) {
     }
 }
 function doTranslateFile(filePath) {
-    if (filePath.indexOf('DeviceHTML5.as') < 0)
+    if (filePath.indexOf('GuildCrossPvpRewardView.as') < 0)
         return;
     var relativePath = path.relative(inputFolder, filePath);
-    if (transOption && transOption.skipRule && transOption.skipRule.files) {
+    if (transOption.skipRule && transOption.skipRule.files) {
         for (var _i = 0, _a = transOption.skipRule.files; _i < _a.length; _i++) {
             var sf = _a[_i];
             if (sf.test(relativePath)) {
@@ -112,16 +143,37 @@ function doTranslateFile(filePath) {
             }
         }
     }
-    console.log('parsing: ', filePath);
-    var outFilePath = filePath.replace(inputFolder, outputFolder);
-    var outFilePP = path.parse(outFilePath);
+    if (continueLast && meetLast) {
+        if (filePath == meetLast) {
+            meetLast = null;
+        }
+        else {
+            return;
+        }
+    }
+    fs.writeFileSync(lastConfPath, inputFolder + '|' + outputFolder + '|' + filePath);
+    console.log('\x1B[1A\x1B[Kparsing: %s', filePath);
     var tsContent = as2ts.translate(filePath);
+    if (transOption.tmpRoot) {
+        var tmpTsPath = tmpTsDir + relativePath.replace('.as', '.ts');
+        var tmpTsPP = path.parse(tmpTsPath);
+        if (!fs.existsSync(tmpTsPP.dir))
+            fs.mkdirSync(tmpTsPP.dir, { recursive: true });
+        fs.writeFileSync(tmpTsPath, tsContent);
+    }
     // 分析语法树
     var ast = parser.parse(tsContent, { loc: true, range: true });
-    // console.log(JSON.stringify(ast));
-    var relativePP = path.parse(relativePath);
-    tsContent = tsMaker.make(ast, relativePP.dir.replace('\\', '/') + '/');
+    if (transOption.tmpRoot) {
+        var tmpAstPath = tmpAstDir + relativePath.replace('.as', '.json');
+        var tmpAstPP = path.parse(tmpAstPath);
+        if (!fs.existsSync(tmpAstPP.dir))
+            fs.mkdirSync(tmpAstPP.dir, { recursive: true });
+        fs.writeFileSync(tmpAstPath, JSON.stringify(ast));
+    }
+    tsContent = tsMaker.make(ast, relativePath);
+    var outFilePath = filePath.replace(inputFolder, outputFolder);
     var tsFilePath = outFilePath.replace(/\.as$/, '.ts');
+    var outFilePP = path.parse(outFilePath);
     if (!fs.existsSync(outFilePP.dir))
         fs.mkdirSync(outFilePP.dir, { recursive: true });
     fs.writeFileSync(tsFilePath, tsContent);

@@ -1,7 +1,8 @@
-import { Accessibility, ArrayExpression, ArrayPattern, ArrowFunctionExpression, AssignmentExpression, AssignmentPattern, AwaitExpression, BigIntLiteral, BinaryExpression, BlockStatement, BreakStatement, CallExpression, CatchClause, ClassBody, ClassDeclaration, ClassExpression, ClassProperty, ConditionalExpression, ContinueStatement, DebuggerStatement, Decorator, DoWhileStatement, EmptyStatement, ExportAllDeclaration, ExportDefaultDeclaration, ExportNamedDeclaration, ExportSpecifier, ExpressionStatement, ForInStatement, ForOfStatement, ForStatement, FunctionDeclaration, FunctionExpression, Identifier, IfStatement, ImportDeclaration, ImportDefaultSpecifier, ImportNamespaceSpecifier, ImportSpecifier, LabeledStatement, Literal, LogicalExpression, MemberExpression, MetaProperty, MethodDefinition, NewExpression, ObjectExpression, ObjectPattern, Program, Property, RestElement, ReturnStatement, SequenceExpression, SpreadElement, Super, SwitchCase, SwitchStatement, TaggedTemplateExpression, TemplateElement, TemplateLiteral, ThisExpression, ThrowStatement, TryStatement, UnaryExpression, UpdateExpression, VariableDeclaration, VariableDeclarator, WhileStatement, WithStatement, YieldExpression, TSEnumDeclaration, BindingName, TSAsExpression, TSInterfaceDeclaration, TSTypeAssertion, TSModuleDeclaration, TSModuleBlock, TSDeclareFunction, TSAbstractMethodDefinition, TSTypeAnnotation, TSTypeParameterInstantiation, TSTypeReference, TSVoidKeyword, BaseNode } from '@typescript-eslint/types/dist/ts-estree';
+import { Accessibility, ArrayExpression, ArrayPattern, ArrowFunctionExpression, AssignmentExpression, AssignmentPattern, AwaitExpression, BigIntLiteral, BinaryExpression, BlockStatement, BreakStatement, CallExpression, CatchClause, ClassBody, ClassDeclaration, ClassExpression, ClassProperty, ConditionalExpression, ContinueStatement, DebuggerStatement, Decorator, DoWhileStatement, EmptyStatement, ExportAllDeclaration, ExportDefaultDeclaration, ExportNamedDeclaration, ExportSpecifier, ExpressionStatement, ForInStatement, ForOfStatement, ForStatement, FunctionDeclaration, FunctionExpression, Identifier, IfStatement, ImportDeclaration, ImportDefaultSpecifier, ImportNamespaceSpecifier, ImportSpecifier, LabeledStatement, Literal, LogicalExpression, MemberExpression, MetaProperty, MethodDefinition, NewExpression, ObjectExpression, ObjectPattern, Program, Property, RestElement, ReturnStatement, SequenceExpression, SpreadElement, Super, SwitchCase, SwitchStatement, TaggedTemplateExpression, TemplateElement, TemplateLiteral, ThisExpression, ThrowStatement, TryStatement, UnaryExpression, UpdateExpression, VariableDeclaration, VariableDeclarator, WhileStatement, WithStatement, YieldExpression, TSEnumDeclaration, BindingName, TSAsExpression, TSClassImplements, TSInterfaceDeclaration, TSTypeAssertion, TSModuleDeclaration, TSModuleBlock, TSDeclareFunction, TSAbstractMethodDefinition, TSInterfaceBody, TSMethodSignature, TSTypeAnnotation, TSTypeParameterInstantiation, TSTypeReference, TSVoidKeyword, BaseNode } from '@typescript-eslint/types/dist/ts-estree';
 import { AST_NODE_TYPES } from '@typescript-eslint/typescript-estree';
 import { As2TsImportRule, As2TsOption } from '.';
 import util = require('util');
+import path = require('path');
 
 class FunctionInfo {
     name: string;
@@ -24,12 +25,14 @@ export class TsMaker {
     private option: As2TsOption;
     private readonly simpleTypes: string[] = ['number', 'string', 'boolean', 'any', 'Array', '[]', 'Object', 'void'];
 
+    private relativePath: string;
     private crtClass: ClassInfo;
     private classMap: {[name: string]: ClassInfo} = {};
     private crtFunc: FunctionInfo;
 
     private importedMap: {[key: string]: boolean};
     private allTypes: string[];
+    private startAddThis: boolean;
 
     constructor(option: As2TsOption) {
         this.option = option || {};
@@ -151,10 +154,14 @@ export class TsMaker {
         return ast.__calPriority;
     }
 
-    make(ast: any, modulePath: string): string {
+    make(ast: any, relativePath: string): string {
         this.allTypes = [];
         this.importedMap = {};
+        this.relativePath = relativePath;
         let str = this.codeFromAST(ast);
+
+        let relativePP = path.parse(relativePath);
+        let modulePath = relativePP.dir.replace('\\', '/') + '/';
         for(let i = 0, len = this.allTypes.length; i < len; i++) {
             let type = this.allTypes[i];
             if(!this.importedMap[type] && !this.isSimpleType(type)) {
@@ -441,6 +448,10 @@ export class TsMaker {
                 str += this.codeFromTryStatement(ast);
                 break;
 
+            case AST_NODE_TYPES.TSClassImplements:
+                str += this.codeFromTSClassImplements(ast);
+                break;
+
             case AST_NODE_TYPES.UnaryExpression:
                 str += this.codeFromUnaryExpression(ast);
                 break;
@@ -483,6 +494,14 @@ export class TsMaker {
 
             case AST_NODE_TYPES.TSEnumDeclaration:
                 str += this.codeFromTSEnumDeclaration(ast);
+                break;
+
+            case AST_NODE_TYPES.TSInterfaceBody:
+                str += this.codeFromTSInterfaceBody(ast);
+                break;
+
+            case AST_NODE_TYPES.TSMethodSignature:
+                str += this.codeFromTSMethodSignature(ast);
                 break;
 
             case AST_NODE_TYPES.TSModuleBlock:
@@ -638,9 +657,11 @@ export class TsMaker {
             }
             allAgmStr += argStr;
         }
-        str = calleeStr + '(';
-            str += allAgmStr;
-            str += ')';
+        if(calleeStr == '__JS__') {
+            str = allAgmStr.substr(1, allAgmStr.length - 2);
+        } else {
+            str = calleeStr + '(' + allAgmStr + ')';
+        }
         return str;
     }
 
@@ -678,6 +699,7 @@ export class TsMaker {
             this.assert(false, ast, 'Class name is necessary!');
         }
         let className = this.codeFromAST(ast.id);
+        this.importedMap[className] = true;
         this.crtClass = new ClassInfo();
         this.crtClass.name = className;
 
@@ -692,8 +714,15 @@ export class TsMaker {
             str += 'extends ' + this.codeFromAST(ast.superClass) + ' ';
         }
         if(ast.implements) {
-            (ast.implements as any).__isType = true;
-            str += 'implements ' + this.codeFromAST(ast.implements) + ' ';
+            str += 'implements ';
+            for(let i = 0, len = ast.implements.length; i < len; i++) {
+                if(i > 0) {
+                    str += ', ';
+                }
+                (ast.implements[i] as any).__isType = true;
+                str += this.codeFromAST(ast.implements[i]);
+            }
+            str += ' ';
         }
         // if(ast.abstract) {
         //   // boolean;
@@ -865,6 +894,9 @@ export class TsMaker {
         if (!funcName && ast.id) {
             funcName = this.codeFromAST(ast.id);
         }
+        if(!funcName) {
+            funcName = 'function';
+        }
         if(accessibility) {
             str += accessibility + ' ';
         }
@@ -876,13 +908,9 @@ export class TsMaker {
         } 
 
         this.crtFunc = new FunctionInfo();
-        if (funcName) {
-            str += funcName + '(';
-            this.crtFunc.name = funcName;
-            this.crtClass.functionMap[funcName] = this.crtFunc;
-        } else {
-            this.assert(false, ast, 'Not support anony function');
-        }
+        str += funcName + '(';
+        this.crtFunc.name = funcName;
+        this.crtClass.functionMap[funcName] = this.crtFunc;
         if (ast.params) {
             for (let i = 0, len = ast.params.length; i < len; i++) {
                 if (i > 0) {
@@ -902,6 +930,7 @@ export class TsMaker {
 
         if (ast.body) {
             // 构造函数加上super
+            this.startAddThis = true;
             let bodyStr = this.codeFromAST(ast.body);
             if('constructor' == funcName && bodyStr.indexOf('super(') < 0) {
                 if(bodyStr) {
@@ -910,6 +939,7 @@ export class TsMaker {
                     bodyStr = 'super();';
                 }
             }
+            this.startAddThis = false;
             str += this.indent(bodyStr);
         }
         str += '\n}'
@@ -926,10 +956,10 @@ export class TsMaker {
         if('constructor' != str && this.option.idReplacement && this.option.idReplacement[str]) {
             str = this.option.idReplacement[str];
         }
-        if((ast as any).__isFuncParam) {
+        if((ast as any).__isFuncParam && this.crtFunc) {
             this.crtFunc.params.push(str);
         }
-        if((!(ast as any).__parent || (ast as any).__parent.type != AST_NODE_TYPES.MemberExpression) && null != this.crtClass && null != this.crtFunc) {
+        if(this.startAddThis && (!(ast as any).__parent || (ast as any).__parent.type != AST_NODE_TYPES.MemberExpression) && null != this.crtClass && null != this.crtFunc) {
             if(this.crtFunc.params.indexOf(str) < 0 && (this.crtClass.functionMap[str] || this.crtClass.properties.indexOf(str) >= 0)) {
                 str = 'this.' + str;
             }
@@ -1194,7 +1224,7 @@ export class TsMaker {
         let caseStr = '';
         for (let i = 0, len = ast.cases.length; i < len; i++) {
             if (i > 0) {
-                caseStr += ',\n';
+                caseStr += '\n';
             }
             caseStr += this.codeFromSwitchCase(ast.cases[i]);
         }
@@ -1239,6 +1269,15 @@ export class TsMaker {
             str += '\n}'
         }
         str += '\n';
+        return str;
+    }
+
+    private codeFromTSClassImplements(ast: TSClassImplements): string {
+        let str = '';
+        str += this.codeFromAST(ast.expression);
+        if(ast.typeParameters) {
+            str += '<' + this.codeFromAST(ast.typeParameters) + '>';
+        }
         return str;
     }
 
@@ -1353,19 +1392,82 @@ export class TsMaker {
         // return '';
     }
 
+    private codeFromTSInterfaceBody(ast: TSInterfaceBody): string {
+        let str = '';
+        for(let i = 0, len = ast.body.length; i < len; i++) {
+            if(i > 0) {
+                str += '\n';
+            }
+            str += this.codeFromAST(ast.body[i]);
+        }
+        return str;
+    }
+
+    private codeFromTSMethodSignature(ast: TSMethodSignature): string {
+        let str = '';
+        if(ast.accessibility) {
+            str += ast.accessibility + ' ';
+        }
+        if(ast.static) {
+            str += 'static ';
+        }
+
+        str += this.codeFromAST(ast.key) + '(';
+        if (ast.params) {
+            for (let i = 0, len = ast.params.length; i < len; i++) {
+                if (i > 0) {
+                    str += ', ';
+                }
+                let oneParam = ast.params[i];
+                (oneParam as any).__parent = ast;
+                (oneParam as any).__isFuncParam = true;
+                str += this.codeFromAST(oneParam);
+            }
+        }
+        str += ')';
+        if(ast.returnType) {
+            str += ': ' + this.codeFromAST(ast.returnType);
+        }
+        str += ';';
+        return str;
+    }
+
     private codeFromTSModuleBlock(ast: TSModuleBlock): string {
-        this.assert(false, ast, 'Not support TSModuleBlock yet');
-        return '';
+        let str = '';
+        for(let i = 0, len = ast.body.length; i < len; i++) {
+            if(i > 0) {
+                str += '\n';
+            }
+            str += this.codeFromAST(ast.body[i]);
+        }
+        return str;
     }
 
     private codeFromTSModuleDeclaration(ast: TSModuleDeclaration): string {
-        this.assert(false, ast, 'Not support TSModuleDeclaration yet');
+        if(ast.body) {
+            return this.codeFromAST(ast.body);
+        }
         return '';
     }
 
     private codeFromTSInterfaceDeclaration(ast: TSInterfaceDeclaration): string {
-        this.assert(false, ast, 'Not support TSInterfaceDeclaration yet');
-        return '';
+        this.assert(!ast.implements, ast, 'not support implements yet!');
+        let str = 'export interface ';
+        str += this.codeFromAST(ast.id) + ' ';
+        if(ast.extends) {
+            str += 'extends ';
+            for(let i = 0, len = ast.extends.length; i < len; i++) {
+                if(i > 0) {
+                    str += ', ';
+                }
+                str += this.codeFromAST(ast.extends[i]);
+            }
+            str += ' ';
+        }
+        str += '{\n';
+        str += this.indent(this.codeFromAST(ast.body));
+        str += '\n}';
+        return str;
     }
 
     private codeFromTSTypeAssertion(ast: TSTypeAssertion): string {
@@ -1375,6 +1477,7 @@ export class TsMaker {
 
     private codeFromTSTypeAnnotation(ast: TSTypeAnnotation): string {
         let str = this.codeFromAST(ast.typeAnnotation);
+        if(str == 'Array') str = 'any[]';
         return str;
     }
 
@@ -1436,10 +1539,13 @@ export class TsMaker {
   
     private assert(cond: boolean, ast: BaseNode, message: string = null) {
         if (!cond) {
-            // if (this.isDevMode) {
-            //     console.log(util.inspect(ast, true, 6));
-            // }
-            console.log('\x1B[36m%s\x1B[0m:\x1B[33m%d:%d\x1B[0m - \x1B[31merror\x1B[0m: %s', '[file]', ast.loc.start.line, ast.loc.start.column, message ? message : 'Error');
+            if (this.option.errorDetail) {
+                console.log(util.inspect(ast, true, 6));
+            }
+            console.log('\x1B[36m%s\x1B[0m(tmp/tmp.ts:\x1B[33m%d:%d\x1B[0m) - \x1B[31merror\x1B[0m: %s', this.relativePath, ast.loc.start.line, ast.loc.start.column, message ? message : 'Error');
+            if(this.option.terminateWhenError) {
+                throw new Error('[As2TS]Something wrong encountered.');
+            }
         }
     }
 }

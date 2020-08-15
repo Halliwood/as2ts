@@ -9,15 +9,19 @@ export class As2Ts {
             let ctorRe = new RegExp('(?<=function )' + className + '(?=\\()');
             asContent = asContent.replace(ctorRe, 'constructor');
         }
-        asContent = asContent.replace(/public(?= class)/g, 'export');
-        // 去掉package
-        let pkgMatchRst = asContent.match(/^\s*package\s*[^\{]+\s*\{\s*/);
-        if(pkgMatchRst) {
-            asContent = asContent.substr(pkgMatchRst[0].length);
-            asContent = asContent.replace(/\s*\}\s*$/, '');
-        }
+        // 去掉final关键字
+        asContent = asContent.replace(/(?<!\w)final\s+/g, '');
+        asContent = asContent.replace(/public\s+(?=(class|interface))/g, 'export ');
+        // // 去掉package
+        // let newAsContent = asContent.replace(/(?<!\w)package\s*[^\{]+\s*\{\s*/, '');
+        // if(newAsContent != asContent) {
+        //     asContent = newAsContent;
+        //     asContent = asContent.replace(/\s*\}\s*$/, '');
+        // }
+        // package改成module
+        asContent = asContent.replace(/(?<!\w)package(?=[\s\{])/, 'module');
         // 修改import
-        let iptRe = new RegExp(/\s*import\s+(\S+)\s?;/);
+        let iptRe = new RegExp(/\s*import\s+([\w\.]+)\s?;*/);
         let asLines = asContent.split(/[\r\n]+/);
         for(let i = 0, len = asLines.length; i < len; i++) {
             let oneLine = asLines[i];
@@ -49,12 +53,23 @@ export class As2Ts {
         asContent = asContent.replace(/(?<=protected)\s+function/g, '');
         asContent = asContent.replace(/(?<=private)\s+function/g, '');
         asContent = asContent.replace(/(?<=static)\s+function/g, '');
+        asContent = asContent.replace(/(?<=\s)function(?=\s+\w+)/g, '');
 
         // is改instanceof
-        asContent = asContent.replace(/if\s?\((\S+)\s+is\s+(\S+)\)/g, 'if($1 instanceof $2)');
+        asContent = asContent.replace(/if\s?\((.+)\s+is\s+(\S+)\)/g, 'if($1 instanceof $2)');
+        asContent = asContent.replace(/=\s*(.+)\s+is\s+/g, '= $1 instanceof $2');
 
         // Vector.<xxx>改Array<xxx>
         asContent = asContent.replace(/Vector\.(?=<)/g, 'Array');
+	
+        // for each 换成 for of
+        asContent = asContent.replace(/for each\s?\(\s?(?:var|let)\s+(\w+)(?:\s*:\s*[\w|\.|<|>]+)?\s+in\s+/g, 'for (let $1 of ');
+        asContent = asContent.replace(/for each\s?\(\s?(\w+)\s+in\s+/g, 'for ($1 of ');
+
+        // Vector.<xx> 改 xx[]
+        asContent = asContent.replace(/(?!<\w)Vector\./g, 'Array');
+        asContent = asContent.replace(/new Array<([\w|\.]+)>;/g, 'new Array<$1>();');
+        asContent = asContent.replace(/new <[\w|\.]+>(?=\[)/g, '')
 
         return asContent;
     }
