@@ -161,7 +161,7 @@ sub checkSkipDir
 sub checkSkipFile
 {
 	my $input=shift;
-	return ($input !~ /\.as/ || $input =~ /MsgPool\.as/ || $input =~ /FyMsg\.as/ || $input =~ /DecodeUtil\.as/ || $input =~ /EncodeUtil\.as/);
+	return ($input !~ /ActHomeView\.as/ || $input =~ /MsgPool\.as/ || $input =~ /FyMsg\.as/ || $input =~ /DecodeUtil\.as/ || $input =~ /EncodeUtil\.as/);
 }
 
 ##

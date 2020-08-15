@@ -1,0 +1,4 @@
+**/node_modules/
+*.pl
+*.txt
+*.bat

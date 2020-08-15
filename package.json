@@ -1,0 +1,35 @@
+{
+  "name": "as2ts",
+  "version": "1.0.0",
+  "description": "An useful tool to translate actionscript code to typescript.",
+  "main": "as2ts.js",
+  "scripts": {
+    "test": "tsc && node index.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Halliwood/as2ts.git"
+  },
+  "keywords": [
+    "typescript",
+    "actionscript",
+    "ts",
+    "as3",
+    "translation"
+  ],
+  "author": "teppei",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Halliwood/as2ts/issues"
+  },
+  "homepage": "https://github.com/Halliwood/as2ts#readme",
+  "devDependencies": {
+    "@types/node": "^14.0.27",
+    "@types/typescript": "^2.0.0",
+    "dtsmake": "0.0.10"
+  },
+  "dependencies": {
+    "@typescript-eslint/typescript-estree": "^3.9.0",
+    "typescript": "^3.9.7"
+  }
+}

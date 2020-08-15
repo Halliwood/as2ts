@@ -1,19 +1,10 @@
 var arguments = process.argv.splice(2);
 go.apply(this, arguments);
 
-function go(jsFile) {
+function go(asRoot, tsRoot) {
     var esprima = require('esprima'), fs = require('fs'), path = require('path');
     
     var errorMsg, astSaved1, astSaved2;
-
-    // 以下变量的派生不予混淆
-    var stopUglyMap = {};
-    var stopUglyNames = ['Browser', 'window', 'wx', 'OPEN_DATA'];
-    for(var i = 0, len = stopUglyNames.length; i < len; i++) {
-        stopUglyMap[stopUglyNames[i]] = true;
-    }
-    
-    var rubbishVarCnt = 0, rubbishClassCnt = 0;
 
     // 以下变量不予混淆
     var protectedMap = {};
@@ -70,28 +61,6 @@ function go(jsFile) {
     
     var astArr = [];
     var formatNewLine = '\n';
-    var formatBlanks = '    ';
-    var seperateLine = '----------';
-    
-    // 获取所有表格结构名称
-    st = et;
-    log('fetching all cfg class names....');
-    var cfgClassNameMap = {};
-    var theCfgClassPath = path.resolve(cfgClassPath);
-    var cfgClassFiles = fs.readdirSync(theCfgClassPath);
-    cfgClassFiles.forEach(function(filename){
-        var filenameInfo = path.parse(filename);
-        cfgClassNameMap[filenameInfo.name] = true;
-        // cfg.b的析构函数不能混淆
-        noUglyMap['d' + filenameInfo.name] = true;
-    });
-    et = (new Date()).getTime();
-    log('all cfg class names fetched, ' + (et - st) + 'ms costed. ');
-    
-    const ComplexDeep = 3;
-    const SimplestTypes = ['Identifier', 'Literal'];
-    const MaxInsertCnt = 4000;
-    var insertCnt = 0;
     
     for(var i = 0, len = rootJsPaths.length; i < len; i++) {        
         var rootJsPath = rootJsPaths[i];
@@ -137,168 +106,21 @@ function go(jsFile) {
         log('building ugly code....');
         var ast = astArr[i];
         
-        if(insertMode) {    
-            rubbishVarCnt = 0;        
-            // 在中间插入废类
-            var classDefBody;
-            if(rootJsPath.indexOf('package_sub') >= 0) {
-                classDefBody = ast.body[0].expression.expressions[0].argument.callee.body.body[3].declarations;
-            }  else {
-                // classDefBody = ast.body[1].expression.callee.body.body;
-                classDefBody = ast.body[1].expression.expressions[0].argument.callee.body.body[3].declarations;
-            }
-            
-            if(classDefBody) {
-                var classDefBodyLen = classDefBody.length;
-                
-                const insertDistance = 10;
-                var rubbishClassCnt = Math.floor(classDefBodyLen / insertDistance);
-                log('classDefBodyLen = ' +classDefBodyLen + ', rubbishClassCnt = ' + rubbishClassCnt);
-                for(var j = 0; j < rubbishClassCnt; j++) {
-                    var sc = genSimpleClass();
-                    classDefBody.splice(Math.floor(Math.random() * classDefBody.length), 0, sc);
-                }
-            }
-            
-            insertCnt = 0;
-            insertSimpleVars(ast);
-            log(insertCnt + 'vars were inserted.');
-            
-            // 在开头和末尾随机插入废代码：变量声明
-            var rubbishCnt = Math.ceil(Math.random() * 10);
-            for(var j = 0; j < rubbishCnt; j++) {
-                ast.body.unshift(genSimpleVar(false));
-            }
-            log(rubbishCnt + 'vars were inserted at the beginning.');
-            
-            rubbishCnt = Math.ceil(Math.random() * 10)
-            for(var j = 0; j < rubbishCnt; j++) {
-                ast.body.push(genSimpleVar(false));
-            }
-            log(rubbishCnt + 'vars were inserted at the end.');
-        }
-        
         var uglyCode = codeFromAST(ast);
         et = (new Date()).getTime();
         log('ugly code generated, ' + (et - st) + 'ms costed. ');
         
-        if(appendMode) {
-            // 在末尾插入没用的js库
-            var jsCnt = Math.floor(jslibFileNames.length / rootJsPaths.length);
-            for(var j = 0; j < jsCnt; j++) {
-                var jsFilePath = path.join(jslibPath, jslibFileNames[nextJslibIdx++]);
-                var jsContent = fs.readFileSync(jsFilePath, 'utf-8');
-                uglyCode += jsContent;
-            }
-        }
-        
         st = et;
         var saveJsPath = rootJsPath;
         if(!replaceIt) {
-            saveJsPath = rootJsPath.replace(/\.js$/, '.ugly.js');
+            saveJsPath = rootJsPath.replace(/\.as$/, '.ts');
         }
         log('saving ugly code as ' + saveJsPath + '....');        
         fs.writeFileSync(saveJsPath, uglyCode);
-        fs.copyFileSync(saveJsPath, workFolder + i + '.ugly.js');
         
         et = (new Date()).getTime();
         log('ugly code saved, ' + (et - st) + 'ms costed. ');
-        
-        //// 分析丑代码语法树
-        // log('parsing ugly syntax tree...');
-        // st = et;
-        // var uglyAst = esprima.parseScript(uglyCode);
-        // et = (new Date()).getTime();
-        // log('parsing ugly syntax tree finished, ' + (et - st) + 'ms costed. ');
-        
-        //// 对比两棵语法树是否相同
-        // log('comparing two syntax tree...');
-        // st = et;
-        // compareAST(ast, uglyAst);
-        // et = (new Date()).getTime();
-        // log('comparing syntax tree finished, ' + (et - st) + 'ms costed. ');
     }
-    
-    // 混淆json文件
-    if(confuseMode && jsonNames != '!') {
-        st = et;
-        log('uglify json files....');
-        
-        var jsonConfuseInfoArr = [];
-        var realJsonNameArr = [];
-        var jsonDir = fs.readdirSync(jsonPath);        
-        //遍历读取到的文件列表
-        jsonDir.forEach(function(filename){
-            if('~' == jsonNames) {
-                if(/total\d\.json/.test(filename) || /total\d\w{5}\.json/.test(filename)) {
-                    realJsonNameArr.push(filename);
-                }
-            } else {
-                var jsonNameArr = jsonNames.split(',');
-                for(var i = 0, len = jsonNameArr.length; i < len; i++) {
-                    var nameRe = new RegExp(jsonNameArr[i] + '\\.json');
-                    var nameReMd5 = new RegExp(jsonNameArr[i] + '\\w{5}' + '\\.json');
-                    if(nameRe.test(filename) || nameReMd5.test(filename)) {
-                        realJsonNameArr.push(filename);
-                        break;
-                    } 
-                }
-            }
-        });
-        for(var i = 0, len = realJsonNameArr.length; i < len; i++) {
-            var jsonFilePath = path.join(jsonPath, realJsonNameArr[i]);
-            log('ugly json file: ' + jsonFilePath);
-            // 读取文件内容
-            var content = fs.readFileSync(jsonFilePath, 'utf-8');
-            var fdata = JSON.parse(content);
-            uglyJson(fdata, 0);
-            fs.writeFileSync(jsonFilePath, JSON.stringify(fdata));
-        }
-        et = (new Date()).getTime();
-        log('ugly json file saved, ' + (et - st) + 'ms costed. ');
-        log(jsonConfuseInfoArr.join(', '));
-        
-        function uglyJson(json, deep) {
-            var uglifyKeys = !(json instanceof Array);
-            for(var jkey in json) {
-                var tmp = json[jkey];
-                if(tmp instanceof Object) {
-                    uglyJson(tmp, deep + 1);                
-                }
-                if(uglifyKeys) {
-                    var uglyKey = toUgly(jkey);
-                    if(uglyKey != jkey) {
-                        if(0 == deep) {
-                            jsonConfuseInfoArr.push(jkey + '->' + uglyKey);
-                        }
-                        json[uglyKey] = tmp;
-                        delete json[jkey];
-                    }
-                }
-            }
-        }
-    }
-        
-    // 保存混淆记录
-    log('saving confusion record...');
-    st = et;
-    var confusionContent = '';
-    for(var key in uglyMap) {
-        confusionContent += key + ', ' + uglyMap[key] + '\n';
-    }
-    confusionContent += seperateLine + '\n';
-    for(var key in protectedMap) {
-        confusionContent += key + ',';
-    }
-    for(var key in noUglyMap) {
-        confusionContent += key + ',';
-    }
-    var confusionRecordName = workFolder + 'confusion' + st + '.txt';
-    fs.writeFileSync(confusionRecordName, confusionContent);
-    
-    et = (new Date()).getTime();
-    fs.copyFileSync(confusionRecordName, workFolder + 'lastConfusion.txt');
-    log('confusion record saved, ' + (et - st) + 'ms costed. ');
     
     checkDisplayError();
     log('total cost ' + (et - startAt) + 'ms. ');
@@ -317,42 +139,6 @@ function go(jsFile) {
             str = '' + ast;
         }
         return str + '\n';
-    }
-    
-    function insertSimpleVars(ast) {
-        if (ast.__isRubbish || ast.__noRubbish || insertCnt > MaxInsertCnt) {
-            return;
-        }
-        for(var key in ast) {
-            var sast = ast[key];
-            if(sast instanceof Object) {
-                insertSimpleVars(sast);
-            }
-        }
-        if(ast.type == 'BlockStatement') {
-            if(!ast.body.__hasRubbish && !ast.body.__noRubbish && Math.random() > 0.6) {                
-                var savedVarCnt = rubbishVarCnt;
-                rubbishVarCnt = 0;
-                ast.body.splice(Math.floor(Math.random() * ast.body.length), 0, genSimpleVar(true));
-                ast.body.__hasRubbish = true;
-                insertCnt++;
-                rubbishVarCnt = savedVarCnt;
-            }
-        } 
-        // else if(ast.type == 'VariableDeclaration' && !ast.__noRubbish && !ast.declarations.__hasRubbish) {
-            // var dlen = ast.declarations.length;
-                
-            // const insertDistance = 5;
-            // var vcnt = Math.floor(dlen / insertDistance);
-            // var namebase = ast.declarations[0].id.name + '__rubbish';
-            // for(var i = 0; i < rubbishClassCnt; i++) {
-                // var svd = genSimpleVarDct(namebase + i);
-                // ast.declarations.splice(Math.floor(Math.random() * ast.declarations.length), 0, svd);
-            // }
-            // ast.declarations.__hasRubbish = true;
-            // insertCnt+=vcnt;
-        // } else {
-        // }
     }
 
     function markLayaClasses(ast) {
