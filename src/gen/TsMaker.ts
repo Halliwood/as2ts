@@ -633,18 +633,14 @@ export class TsMaker {
     private codeFromCallExpression(ast: CallExpression): string {
         (ast.callee as any).__parent = ast;
         let calleeStr = this.codeFromAST(ast.callee);
+        if(this.option.methordMapper && this.option.methordMapper[calleeStr]) {
+            calleeStr = this.option.methordMapper[calleeStr];
+        }
         let str = '';
         let allAgmStr = '';
         for (let i = 0, len = ast.arguments.length; i < len; i++) {
             let arg = ast.arguments[i];
             let argStr = this.codeFromAST(arg);
-            // if (arg.type == AST_NODE_TYPES.AssignmentExpression) {
-            //     str += argStr + '\n';
-            //     argStr = this.codeFromAST((arg as AssignmentExpression).left);
-            // } else if (arg.type == AST_NODE_TYPES.UpdateExpression) {
-            //     str += argStr + '\n';
-            //     argStr = this.codeFromAST((arg as UpdateExpression).argument);
-            // }
             if (allAgmStr) {
                 allAgmStr += ', ';
             }
@@ -899,7 +895,10 @@ export class TsMaker {
             str += kind + ' ';
         } 
 
-        this.crtFunc = this.crtClass.functionMap[funcName];
+        if(this.crtClass) {
+            if(funcName == this.crtClass.name) funcName = 'constructor';
+            this.crtFunc = this.crtClass.functionMap[funcName];
+        }
         str += funcName + '(';
         if (ast.params) {
             for (let i = 0, len = ast.params.length; i < len; i++) {
@@ -913,7 +912,7 @@ export class TsMaker {
             }
         }
         str += ')';
-        if(ast.returnType && kind != 'set') {
+        if(ast.returnType && kind != 'set' && funcName != 'constructor') {
             str += ': ' + this.codeFromAST(ast.returnType);
         }
         str += ' {\n';
@@ -998,12 +997,18 @@ export class TsMaker {
     private codeFromImportDeclaration(ast: ImportDeclaration): string {
         let str = 'import ';
         let specifierStr = '';
+        let cnt = 0;
         for(let i = 0, len = ast.specifiers.length; i < len; i++) {
-            if(i > 0) {
+            let ss = this.codeFromAST(ast.specifiers[i]);
+            if(this.importedMap[ss]) continue;
+            if(cnt > 0) {
                 specifierStr += ', ';
             }
-            specifierStr += this.codeFromAST(ast.specifiers[i]);
+            specifierStr += ss;
+            this.importedMap[ss] = true;
+            cnt++;
         }
+        if(cnt == 0) return '';
         let sourceStr: string;
         if(this.option.importRule && this.option.importRule.fromModule) {
             for(let fm of this.option.importRule.fromModule) {
@@ -1034,7 +1039,6 @@ export class TsMaker {
 
     private codeFromImportSpecifier(ast: ImportSpecifier): string {
         let str = this.codeFromAST(ast.imported);
-        this.importedMap[str] = true;
         return str;
     }
 

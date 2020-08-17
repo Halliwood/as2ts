@@ -31,6 +31,17 @@ var As2TsPhase;
     As2TsPhase[As2TsPhase["Analyse"] = 0] = "Analyse";
     As2TsPhase[As2TsPhase["Make"] = 1] = "Make";
 })(As2TsPhase || (As2TsPhase = {}));
+var DefaultTypeMapper = {
+    "int": "number",
+    "Number": "number",
+    "uint": "number",
+    "Boolean": "boolean",
+    "String": "string",
+    "Object": "any"
+};
+var DefaultMethordMapper = {
+    "trace": "console.log"
+};
 var as2ts;
 var tsAnalysor;
 var tsMaker;
@@ -44,14 +55,6 @@ var optionExample = {
     },
     literalReplacement: {
         "\"automatic/constants/KW\"": "\"automatic/constants/KeyWord\""
-    },
-    typeMapper: {
-        "int": "number",
-        "Number": "number",
-        "uint": "number",
-        "Boolean": "boolean",
-        "String": "string",
-        "Object": "any"
     },
     importRule: {
         "fromModule": [
@@ -81,6 +84,10 @@ function translateFiles(inputPath, outputPath, option) {
     inputFolder = inputPath;
     outputFolder = outputPath;
     transOption = option || {};
+    if (!transOption.typeMapper) {
+        transOption.typeMapper = mergeOption(transOption.typeMapper, DefaultTypeMapper);
+        transOption.methordMapper = mergeOption(transOption.methordMapper, DefaultMethordMapper);
+    }
     if (!transOption.tmpRoot) {
         transOption.tmpRoot = 'tmp/';
     }
@@ -207,4 +214,14 @@ function doTranslateFile(filePath, phase) {
 function dumpAnalysor() {
     var analysorInfoPath = transOption.tmpRoot + '/analysor.txt';
     fs.writeFileSync(analysorInfoPath, tsAnalysor.toString());
+}
+function mergeOption(a, b) {
+    if (!a)
+        a = {};
+    for (var bkey in b) {
+        if (!a[bkey]) {
+            a[bkey] = b[bkey];
+        }
+    }
+    return a;
 }

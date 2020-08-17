@@ -132,6 +132,9 @@ var TsAnalysor = /** @class */ (function () {
             case typescript_estree_1.AST_NODE_TYPES.TSModuleDeclaration:
                 str += this.processTSModuleDeclaration(ast);
                 break;
+            case typescript_estree_1.AST_NODE_TYPES.TSInterfaceDeclaration:
+                str += this.processTSInterfaceDeclaration(ast);
+                break;
             default:
                 break;
         }
@@ -201,6 +204,8 @@ var TsAnalysor = /** @class */ (function () {
             funcName = 'function';
         }
         if (this.crtClass) {
+            if (funcName == this.crtClass.name)
+                funcName = 'constructor';
             this.crtFunc = new FunctionInfo();
             this.crtFunc.name = funcName;
             this.crtFunc.accessibility = accessibility;
@@ -249,6 +254,13 @@ var TsAnalysor = /** @class */ (function () {
         if (ast.body) {
             this.processAST(ast.body);
         }
+    };
+    TsAnalysor.prototype.processTSInterfaceDeclaration = function (ast) {
+        var className = this.codeFromAST(ast.id);
+        this.crtClass = new ClassInfo();
+        this.crtClass.name = className;
+        this.crtClass.module = this.module;
+        this.classMap[className] = this.crtClass;
     };
     TsAnalysor.prototype.codeFromAST = function (ast) {
         if (ast.type == typescript_estree_1.AST_NODE_TYPES.Identifier) {

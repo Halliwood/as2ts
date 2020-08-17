@@ -502,18 +502,14 @@ var TsMaker = /** @class */ (function () {
     TsMaker.prototype.codeFromCallExpression = function (ast) {
         ast.callee.__parent = ast;
         var calleeStr = this.codeFromAST(ast.callee);
+        if (this.option.methordMapper && this.option.methordMapper[calleeStr]) {
+            calleeStr = this.option.methordMapper[calleeStr];
+        }
         var str = '';
         var allAgmStr = '';
         for (var i = 0, len = ast.arguments.length; i < len; i++) {
             var arg = ast.arguments[i];
             var argStr = this.codeFromAST(arg);
-            // if (arg.type == AST_NODE_TYPES.AssignmentExpression) {
-            //     str += argStr + '\n';
-            //     argStr = this.codeFromAST((arg as AssignmentExpression).left);
-            // } else if (arg.type == AST_NODE_TYPES.UpdateExpression) {
-            //     str += argStr + '\n';
-            //     argStr = this.codeFromAST((arg as UpdateExpression).argument);
-            // }
             if (allAgmStr) {
                 allAgmStr += ', ';
             }
@@ -743,7 +739,11 @@ var TsMaker = /** @class */ (function () {
         if (kind == 'get' || kind == 'set') {
             str += kind + ' ';
         }
-        this.crtFunc = this.crtClass.functionMap[funcName];
+        if (this.crtClass) {
+            if (funcName == this.crtClass.name)
+                funcName = 'constructor';
+            this.crtFunc = this.crtClass.functionMap[funcName];
+        }
         str += funcName + '(';
         if (ast.params) {
             for (var i = 0, len = ast.params.length; i < len; i++) {
@@ -757,7 +757,7 @@ var TsMaker = /** @class */ (function () {
             }
         }
         str += ')';
-        if (ast.returnType && kind != 'set') {
+        if (ast.returnType && kind != 'set' && funcName != 'constructor') {
             str += ': ' + this.codeFromAST(ast.returnType);
         }
         str += ' {\n';
@@ -845,12 +845,20 @@ var TsMaker = /** @class */ (function () {
     TsMaker.prototype.codeFromImportDeclaration = function (ast) {
         var str = 'import ';
         var specifierStr = '';
+        var cnt = 0;
         for (var i = 0, len = ast.specifiers.length; i < len; i++) {
-            if (i > 0) {
+            var ss = this.codeFromAST(ast.specifiers[i]);
+            if (this.importedMap[ss])
+                continue;
+            if (cnt > 0) {
                 specifierStr += ', ';
             }
-            specifierStr += this.codeFromAST(ast.specifiers[i]);
+            specifierStr += ss;
+            this.importedMap[ss] = true;
+            cnt++;
         }
+        if (cnt == 0)
+            return '';
         var sourceStr;
         if (this.option.importRule && this.option.importRule.fromModule) {
             for (var _i = 0, _a = this.option.importRule.fromModule; _i < _a.length; _i++) {
@@ -879,7 +887,6 @@ var TsMaker = /** @class */ (function () {
     };
     TsMaker.prototype.codeFromImportSpecifier = function (ast) {
         var str = this.codeFromAST(ast.imported);
-        this.importedMap[str] = true;
         return str;
     };
     TsMaker.prototype.codeFromLabeledStatement = function (ast) {

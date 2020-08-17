@@ -11,6 +11,19 @@ enum As2TsPhase {
     Make
 }
 
+const DefaultTypeMapper = {
+    "int": "number", 
+    "Number": "number", 
+    "uint": "number", 
+    "Boolean": "boolean", 
+    "String": "string", 
+    "Object": "any"
+};
+
+const DefaultMethordMapper = {
+    "trace": "console.log"
+};
+
 let as2ts: As2Ts;
 let tsAnalysor: TsAnalysor;
 let tsMaker: TsMaker;
@@ -24,14 +37,6 @@ let optionExample: As2TsOption = {
     }, 
     literalReplacement: {
         "\"automatic/constants/KW\"": "\"automatic/constants/KeyWord\""
-    }, 
-    typeMapper: {
-        "int": "number", 
-        "Number": "number", 
-        "uint": "number", 
-        "Boolean": "boolean", 
-        "String": "string", 
-        "Object": "any"
     }, 
     importRule: {
         "fromModule": [
@@ -65,6 +70,10 @@ export function translateFiles(inputPath: string, outputPath: string, option?: A
     inputFolder = inputPath;
     outputFolder = outputPath;
     transOption = option || {};
+    if(!transOption.typeMapper) {
+        transOption.typeMapper = mergeOption(transOption.typeMapper, DefaultTypeMapper);
+        transOption.methordMapper = mergeOption(transOption.methordMapper, DefaultMethordMapper);
+    }
 
     if(!transOption.tmpRoot) {
         transOption.tmpRoot = 'tmp/';
@@ -189,4 +198,14 @@ function doTranslateFile(filePath: string, phase: As2TsPhase) {
 function dumpAnalysor() {
     let analysorInfoPath = transOption.tmpRoot + '/analysor.txt';
     fs.writeFileSync(analysorInfoPath, tsAnalysor.toString());
+}
+
+function mergeOption(a: any, b: any) {
+    if(!a) a = {};
+    for(let bkey in b) {
+        if(!a[bkey]) {
+            a[bkey] = b[bkey];
+        }
+    }
+    return a;
 }

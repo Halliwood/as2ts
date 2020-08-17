@@ -142,6 +142,10 @@ export class TsAnalysor {
                 str += this.processTSModuleDeclaration(ast);
                 break;
 
+            case AST_NODE_TYPES.TSInterfaceDeclaration:
+                str += this.processTSInterfaceDeclaration(ast);
+                break;
+
             default:
                 break;
         }
@@ -222,6 +226,7 @@ export class TsAnalysor {
         }
 
         if(this.crtClass) {
+            if(funcName == this.crtClass.name) funcName = 'constructor';
             this.crtFunc = new FunctionInfo();
             this.crtFunc.name = funcName;
             this.crtFunc.accessibility = accessibility;
@@ -276,6 +281,14 @@ export class TsAnalysor {
         if(ast.body) {
             this.processAST(ast.body);
         }
+    }
+
+    private processTSInterfaceDeclaration(ast: TSInterfaceDeclaration) {
+        let className = this.codeFromAST(ast.id);
+        this.crtClass = new ClassInfo();
+        this.crtClass.name = className;
+        this.crtClass.module = this.module;
+        this.classMap[className] = this.crtClass;
     }
 
     private codeFromAST(ast: any): string {
