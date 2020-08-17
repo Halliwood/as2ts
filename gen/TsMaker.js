@@ -4,26 +4,14 @@ exports.TsMaker = void 0;
 var typescript_estree_1 = require("@typescript-eslint/typescript-estree");
 var util = require("util");
 var path = require("path");
-var FunctionInfo = /** @class */ (function () {
-    function FunctionInfo() {
-        this.params = [];
-    }
-    return FunctionInfo;
-}());
-var ClassInfo = /** @class */ (function () {
-    function ClassInfo() {
-        this.properties = [];
-        this.functionMap = {};
-    }
-    return ClassInfo;
-}());
 var TsMaker = /** @class */ (function () {
-    function TsMaker(option) {
+    function TsMaker(analysor, option) {
         // 运算符优先级
         this.pv = 0;
         this.operatorPriorityMap = {};
         this.simpleTypes = ['number', 'string', 'boolean', 'any', 'Array', '[]', 'Object', 'void'];
-        this.classMap = {};
+        this.parentNoThis = [typescript_estree_1.AST_NODE_TYPES.MemberExpression, typescript_estree_1.AST_NODE_TYPES.VariableDeclarator];
+        this.analysor = analysor;
         this.option = option || {};
         this.setPriority(['( … )'], this.pv++);
         this.setPriority(['… . …', '… [ … ]', 'new … ( … )', '… ( … )'], this.pv++);
@@ -572,8 +560,8 @@ var TsMaker = /** @class */ (function () {
         }
         var className = this.codeFromAST(ast.id);
         this.importedMap[className] = true;
-        this.crtClass = new ClassInfo();
-        this.crtClass.name = className;
+        this.crtClass = this.analysor.classMap[className];
+        this.assert(null != this.crtClass, ast, '[ERROR]Cannot find class info: ' + className);
         var str = '';
         if (ast.__exported) {
             str += 'export ';
@@ -632,7 +620,6 @@ var TsMaker = /** @class */ (function () {
             str += 'readonly ';
         }
         var propertyName = this.codeFromAST(ast.key);
-        this.crtClass.properties.push(propertyName);
         str += propertyName;
         if (ast.typeAnnotation) {
             str += ': ' + this.codeFromAST(ast.typeAnnotation);
@@ -756,10 +743,8 @@ var TsMaker = /** @class */ (function () {
         if (kind == 'get' || kind == 'set') {
             str += kind + ' ';
         }
-        this.crtFunc = new FunctionInfo();
+        this.crtFunc = this.crtClass.functionMap[funcName];
         str += funcName + '(';
-        this.crtFunc.name = funcName;
-        this.crtClass.functionMap[funcName] = this.crtFunc;
         if (ast.params) {
             for (var i = 0, len = ast.params.length; i < len; i++) {
                 if (i > 0) {
@@ -780,7 +765,7 @@ var TsMaker = /** @class */ (function () {
             // 构造函数加上super
             this.startAddThis = true;
             var bodyStr = this.codeFromAST(ast.body);
-            if ('constructor' == funcName && bodyStr.indexOf('super(') < 0) {
+            if ('constructor' == funcName && this.crtClass.superClass && bodyStr.indexOf('super(') < 0) {
                 if (bodyStr) {
                     bodyStr = 'super();\n' + bodyStr;
                 }
@@ -801,15 +786,20 @@ var TsMaker = /** @class */ (function () {
     };
     TsMaker.prototype.codeFromIdentifier = function (ast) {
         var str = ast.name;
-        if ('constructor' != str && this.option.idReplacement && this.option.idReplacement[str]) {
+        if (this.option.idReplacement && typeof (this.option.idReplacement[str]) === 'string') {
             str = this.option.idReplacement[str];
         }
-        if (ast.__isFuncParam && this.crtFunc) {
-            this.crtFunc.params.push(str);
-        }
-        if (this.startAddThis && (!ast.__parent || ast.__parent.type != typescript_estree_1.AST_NODE_TYPES.MemberExpression) && null != this.crtClass && null != this.crtFunc) {
-            if (this.crtFunc.params.indexOf(str) < 0 && (this.crtClass.functionMap[str] || this.crtClass.properties.indexOf(str) >= 0)) {
-                str = 'this.' + str;
+        if (this.startAddThis && (!ast.__parent || this.parentNoThis.indexOf(ast.__parent.type) < 0) && null != this.crtClass && null != this.crtFunc) {
+            if (this.crtFunc.params.indexOf(str) < 0) {
+                var minfo = this.getMemberInfo(this.crtClass, str);
+                if (minfo) {
+                    if (minfo.static) {
+                        str = minfo.className + '.' + str;
+                    }
+                    else {
+                        str = 'this.' + str;
+                    }
+                }
             }
         }
         if (ast.typeAnnotation) {
@@ -963,9 +953,9 @@ var TsMaker = /** @class */ (function () {
             }
             argStr += this.codeFromAST(ast.arguments[i]);
         }
-        if ('RegExp' == callee) {
-            return argStr;
-        }
+        // if ('RegExp' == callee) {
+        //     return argStr;
+        // }
         var str = 'new ' + callee + '(' + argStr + ')';
         return str;
     };
@@ -1143,6 +1133,7 @@ var TsMaker = /** @class */ (function () {
         return str;
     };
     TsMaker.prototype.codeFromVariableDeclarator = function (ast) {
+        ast.id.__parent = ast;
         var str = this.codeFromAST(ast.id);
         if (ast.init) {
             str += ' = ' + this.codeFromAST(ast.init);
@@ -1339,6 +1330,31 @@ var TsMaker = /** @class */ (function () {
             return true;
         }
         return false;
+    };
+    TsMaker.prototype.getMemberInfo = function (classInfo, pname) {
+        var finfo = classInfo.functionMap[pname];
+        if (finfo)
+            return finfo;
+        var pinfo = classInfo.propertyMap[pname];
+        if (pinfo)
+            return pinfo;
+        while (classInfo.superClass) {
+            classInfo = this.analysor.classMap[classInfo.superClass];
+            if (classInfo) {
+                var finfo_1 = classInfo.functionMap[pname];
+                if (finfo_1 && finfo_1.accessibility != 'private') {
+                    return finfo_1;
+                }
+                var pinfo_1 = classInfo.propertyMap[pname];
+                if (pinfo_1 && pinfo_1.accessibility != 'private') {
+                    return pinfo_1;
+                }
+            }
+            else {
+                break;
+            }
+        }
+        return null;
     };
     TsMaker.prototype.assert = function (cond, ast, message) {
         if (message === void 0) { message = null; }

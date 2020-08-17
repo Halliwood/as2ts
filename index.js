@@ -24,8 +24,15 @@ var fs = __importStar(require("fs"));
 var path = require("path");
 var As2Ts_1 = require("./gen/As2Ts");
 var TsMaker_1 = require("./gen/TsMaker");
+var TsAnalysor_1 = require("./gen/TsAnalysor");
 var parser = require("@typescript-eslint/typescript-estree");
+var As2TsPhase;
+(function (As2TsPhase) {
+    As2TsPhase[As2TsPhase["Analyse"] = 0] = "Analyse";
+    As2TsPhase[As2TsPhase["Make"] = 1] = "Make";
+})(As2TsPhase || (As2TsPhase = {}));
 var as2ts;
+var tsAnalysor;
 var tsMaker;
 var optionExample = {
     skipRule: {
@@ -63,29 +70,32 @@ var lastConfPath;
 var tmpTsDir;
 var tmpAstDir;
 var continueLast;
-var meetLast;
+var lastCacheFile;
+var hasMeetLast;
 translateFiles('E:\\qhgame\\trunk\\project\\src\\', 'E:\\qhgame\\tsproj\\src\\', optionExample);
 /**不支持内联函数、函数语句、单行声明多个成员变量 */
 function translateFiles(inputPath, outputPath, option) {
     inputFolder = inputPath;
     outputFolder = outputPath;
     transOption = option || {};
-    if (transOption.tmpRoot) {
-        lastConfPath = transOption.tmpRoot + '/last.txt';
-        tmpTsDir = transOption.tmpRoot + '/ts/';
-        tmpAstDir = transOption.tmpRoot + '/ast/';
-        if (!fs.existsSync(tmpTsDir))
-            fs.mkdirSync(tmpTsDir, { recursive: true });
-        if (!fs.existsSync(tmpAstDir))
-            fs.mkdirSync(tmpAstDir, { recursive: true });
+    if (!transOption.tmpRoot) {
+        transOption.tmpRoot = 'tmp/';
     }
+    lastConfPath = transOption.tmpRoot + '/last.txt';
+    tmpTsDir = transOption.tmpRoot + '/ts/';
+    tmpAstDir = transOption.tmpRoot + '/ast/';
+    if (!fs.existsSync(tmpTsDir))
+        fs.mkdirSync(tmpTsDir, { recursive: true });
+    if (!fs.existsSync(tmpAstDir))
+        fs.mkdirSync(tmpAstDir, { recursive: true });
     continueLast = false;
     if (transOption.continueLast && transOption.tmpRoot && fs.existsSync(lastConfPath)) {
         var lastConf = fs.readFileSync(lastConfPath, 'utf-8');
         var lastConfArr = lastConf.split('|');
         if (lastConfArr.length >= 3 && inputPath == lastConfArr[0] && outputPath == lastConfArr[1]) {
             continueLast = true;
-            meetLast = lastConfArr[2];
+            lastCacheFile = lastConfArr[2];
+            hasMeetLast = false;
         }
     }
     if (transOption.continueLast && !continueLast) {
@@ -93,19 +103,26 @@ function translateFiles(inputPath, outputPath, option) {
     }
     if (!as2ts) {
         as2ts = new As2Ts_1.As2Ts();
-        tsMaker = new TsMaker_1.TsMaker(option);
+        tsAnalysor = new TsAnalysor_1.TsAnalysor(option);
+        tsMaker = new TsMaker_1.TsMaker(tsAnalysor, option);
     }
     var inputStat = fs.statSync(inputPath);
     if (inputStat.isFile()) {
-        doTranslateFile(inputPath);
+        doTranslateFile(inputPath, As2TsPhase.Analyse);
+        dumpAnalysor();
+        hasMeetLast = false;
+        doTranslateFile(inputPath, As2TsPhase.Make);
     }
     else {
-        readDir(inputPath);
+        readDir(inputPath, As2TsPhase.Analyse);
+        dumpAnalysor();
+        hasMeetLast = false;
+        readDir(inputPath, As2TsPhase.Make);
     }
     console.log('translation finished.');
 }
 exports.translateFiles = translateFiles;
-function readDir(dirPath) {
+function readDir(dirPath, phase) {
     if (transOption.skipRule && transOption.skipRule.dirs) {
         var relativePath = path.relative(inputFolder, dirPath);
         for (var _i = 0, _a = transOption.skipRule.dirs; _i < _a.length; _i++) {
@@ -123,17 +140,16 @@ function readDir(dirPath) {
         if (fileStat.isFile()) {
             var fileExt = path.extname(filename).toLowerCase();
             if ('.as' == fileExt) {
-                doTranslateFile(filePath);
+                doTranslateFile(filePath, phase);
             }
         }
         else {
-            readDir(filePath);
+            readDir(filePath, phase);
         }
     }
 }
-function doTranslateFile(filePath) {
-    if (filePath.indexOf('GuildCrossPvpRewardView.as') < 0)
-        return;
+function doTranslateFile(filePath, phase) {
+    // if(filePath.indexOf('GameConfig.as')<0) return;
     var relativePath = path.relative(inputFolder, filePath);
     if (transOption.skipRule && transOption.skipRule.files) {
         for (var _i = 0, _a = transOption.skipRule.files; _i < _a.length; _i++) {
@@ -143,38 +159,49 @@ function doTranslateFile(filePath) {
             }
         }
     }
-    if (continueLast && meetLast) {
-        if (filePath == meetLast) {
-            meetLast = null;
+    if (continueLast && lastCacheFile && !hasMeetLast) {
+        if (filePath == lastCacheFile) {
+            hasMeetLast = true;
         }
         else {
             return;
         }
     }
     fs.writeFileSync(lastConfPath, inputFolder + '|' + outputFolder + '|' + filePath);
-    console.log('\x1B[1A\x1B[Kparsing: %s', filePath);
-    var tsContent = as2ts.translate(filePath);
-    if (transOption.tmpRoot) {
-        var tmpTsPath = tmpTsDir + relativePath.replace('.as', '.ts');
-        var tmpTsPP = path.parse(tmpTsPath);
-        if (!fs.existsSync(tmpTsPP.dir))
-            fs.mkdirSync(tmpTsPP.dir, { recursive: true });
-        fs.writeFileSync(tmpTsPath, tsContent);
+    var tmpAstPath = tmpAstDir + relativePath.replace('.as', '.json');
+    if (phase == As2TsPhase.Analyse) {
+        console.log('\x1B[1A\x1B[Kparsing: %s', filePath);
+        var tsContent = as2ts.translate(filePath);
+        if (transOption.tmpRoot) {
+            var tmpTsPath = tmpTsDir + relativePath.replace('.as', '.ts');
+            var tmpTsPP = path.parse(tmpTsPath);
+            if (!fs.existsSync(tmpTsPP.dir))
+                fs.mkdirSync(tmpTsPP.dir, { recursive: true });
+            fs.writeFileSync(tmpTsPath, tsContent);
+        }
+        // 分析语法树
+        var ast = parser.parse(tsContent, { loc: true, range: true });
+        if (transOption.tmpRoot) {
+            var tmpAstPP = path.parse(tmpAstPath);
+            if (!fs.existsSync(tmpAstPP.dir))
+                fs.mkdirSync(tmpAstPP.dir, { recursive: true });
+            fs.writeFileSync(tmpAstPath, JSON.stringify(ast));
+        }
+        tsAnalysor.collect(ast, relativePath);
     }
-    // 分析语法树
-    var ast = parser.parse(tsContent, { loc: true, range: true });
-    if (transOption.tmpRoot) {
-        var tmpAstPath = tmpAstDir + relativePath.replace('.as', '.json');
-        var tmpAstPP = path.parse(tmpAstPath);
-        if (!fs.existsSync(tmpAstPP.dir))
-            fs.mkdirSync(tmpAstPP.dir, { recursive: true });
-        fs.writeFileSync(tmpAstPath, JSON.stringify(ast));
+    else {
+        var outFilePath = filePath.replace(inputFolder, outputFolder);
+        var tsFilePath = outFilePath.replace(/\.as$/, '.ts');
+        console.log('\x1B[1A\x1B[Kmaking: %s', tsFilePath);
+        var astContent = fs.readFileSync(tmpAstPath, 'utf-8');
+        var tsContent = tsMaker.make(JSON.parse(astContent), relativePath);
+        var outFilePP = path.parse(outFilePath);
+        if (!fs.existsSync(outFilePP.dir))
+            fs.mkdirSync(outFilePP.dir, { recursive: true });
+        fs.writeFileSync(tsFilePath, tsContent);
     }
-    tsContent = tsMaker.make(ast, relativePath);
-    var outFilePath = filePath.replace(inputFolder, outputFolder);
-    var tsFilePath = outFilePath.replace(/\.as$/, '.ts');
-    var outFilePP = path.parse(outFilePath);
-    if (!fs.existsSync(outFilePP.dir))
-        fs.mkdirSync(outFilePP.dir, { recursive: true });
-    fs.writeFileSync(tsFilePath, tsContent);
+}
+function dumpAnalysor() {
+    var analysorInfoPath = transOption.tmpRoot + '/analysor.txt';
+    fs.writeFileSync(analysorInfoPath, tsAnalysor.toString());
 }

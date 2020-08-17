@@ -3,17 +3,7 @@ import { AST_NODE_TYPES } from '@typescript-eslint/typescript-estree';
 import { As2TsImportRule, As2TsOption } from '.';
 import util = require('util');
 import path = require('path');
-
-class FunctionInfo {
-    name: string;
-    params: string[] = [];
-}
-
-class ClassInfo {
-    name: string;
-    properties: string[] = [];
-    functionMap: {[name: string]: FunctionInfo} = {};
-}
+import {TsAnalysor, ClassInfo, FunctionInfo, PropertyInfo} from './TsAnalysor';
 
 export class TsMaker {
     
@@ -23,18 +13,20 @@ export class TsMaker {
 
     // 选项
     private option: As2TsOption;
+    private analysor: TsAnalysor;
     private readonly simpleTypes: string[] = ['number', 'string', 'boolean', 'any', 'Array', '[]', 'Object', 'void'];
+    private readonly parentNoThis = [AST_NODE_TYPES.MemberExpression, AST_NODE_TYPES.VariableDeclarator];
 
     private relativePath: string;
     private crtClass: ClassInfo;
-    private classMap: {[name: string]: ClassInfo} = {};
     private crtFunc: FunctionInfo;
 
     private importedMap: {[key: string]: boolean};
     private allTypes: string[];
     private startAddThis: boolean;
 
-    constructor(option: As2TsOption) {
+    constructor(analysor: TsAnalysor, option: As2TsOption) {
+        this.analysor = analysor;
         this.option = option || {};
 
         this.setPriority(['( … )'], this.pv++);
@@ -700,8 +692,8 @@ export class TsMaker {
         }
         let className = this.codeFromAST(ast.id);
         this.importedMap[className] = true;
-        this.crtClass = new ClassInfo();
-        this.crtClass.name = className;
+        this.crtClass = this.analysor.classMap[className];
+        this.assert(null != this.crtClass, ast, '[ERROR]Cannot find class info: ' + className);
 
         let str = '';
         if((ast as any).__exported) {
@@ -764,7 +756,6 @@ export class TsMaker {
             str += 'readonly ';
         }
         let propertyName = this.codeFromAST(ast.key);
-        this.crtClass.properties.push(propertyName);
         str += propertyName;
         if(ast.typeAnnotation) {
             str += ': ' + this.codeFromAST(ast.typeAnnotation);
@@ -907,10 +898,8 @@ export class TsMaker {
             str += kind + ' ';
         } 
 
-        this.crtFunc = new FunctionInfo();
+        this.crtFunc = this.crtClass.functionMap[funcName];
         str += funcName + '(';
-        this.crtFunc.name = funcName;
-        this.crtClass.functionMap[funcName] = this.crtFunc;
         if (ast.params) {
             for (let i = 0, len = ast.params.length; i < len; i++) {
                 if (i > 0) {
@@ -932,7 +921,7 @@ export class TsMaker {
             // 构造函数加上super
             this.startAddThis = true;
             let bodyStr = this.codeFromAST(ast.body);
-            if('constructor' == funcName && bodyStr.indexOf('super(') < 0) {
+            if('constructor' == funcName && this.crtClass.superClass && bodyStr.indexOf('super(') < 0) {
                 if(bodyStr) {
                     bodyStr = 'super();\n' + bodyStr;
                 } else {
@@ -953,15 +942,19 @@ export class TsMaker {
 
     private codeFromIdentifier(ast: Identifier): string {
         let str = ast.name;
-        if('constructor' != str && this.option.idReplacement && this.option.idReplacement[str]) {
+        if(this.option.idReplacement && typeof(this.option.idReplacement[str]) === 'string') {
             str = this.option.idReplacement[str];
         }
-        if((ast as any).__isFuncParam && this.crtFunc) {
-            this.crtFunc.params.push(str);
-        }
-        if(this.startAddThis && (!(ast as any).__parent || (ast as any).__parent.type != AST_NODE_TYPES.MemberExpression) && null != this.crtClass && null != this.crtFunc) {
-            if(this.crtFunc.params.indexOf(str) < 0 && (this.crtClass.functionMap[str] || this.crtClass.properties.indexOf(str) >= 0)) {
-                str = 'this.' + str;
+        if(this.startAddThis && (!(ast as any).__parent || this.parentNoThis.indexOf((ast as any).__parent.type) < 0) && null != this.crtClass && null != this.crtFunc) {
+            if(this.crtFunc.params.indexOf(str) < 0) {
+                let minfo = this.getMemberInfo(this.crtClass, str);
+                if(minfo) {
+                    if(minfo.static) {
+                        str = minfo.className + '.' + str;
+                    } else {
+                        str = 'this.' + str;
+                    }
+                }
             }
         }
         if(ast.typeAnnotation) {
@@ -1122,9 +1115,9 @@ export class TsMaker {
             }
             argStr += this.codeFromAST(ast.arguments[i]);
         }
-        if ('RegExp' == callee) {
-            return argStr;
-        }
+        // if ('RegExp' == callee) {
+        //     return argStr;
+        // }
         let str = 'new ' + callee + '(' + argStr + ')';
         return str;
     }
@@ -1321,6 +1314,7 @@ export class TsMaker {
     }
 
     private codeFromVariableDeclarator(ast: VariableDeclarator): string {
+        (ast.id as any).__parent = ast;
         let str = this.codeFromAST(ast.id);
         if (ast.init) {
             str += ' = ' + this.codeFromAST(ast.init);
@@ -1535,6 +1529,30 @@ export class TsMaker {
             return true;
         }
         return false;
+    }
+
+    private getMemberInfo(classInfo: ClassInfo, pname: string): PropertyInfo {
+        let finfo = classInfo.functionMap[pname];
+        if(finfo) return finfo;
+        let pinfo = classInfo.propertyMap[pname];
+        if(pinfo) return pinfo;
+
+        while(classInfo.superClass) {
+            classInfo = this.analysor.classMap[classInfo.superClass];
+            if(classInfo) {
+                let finfo = classInfo.functionMap[pname];
+                if(finfo && finfo.accessibility != 'private') {
+                    return finfo;
+                }
+                let pinfo = classInfo.propertyMap[pname];
+                if(pinfo && pinfo.accessibility != 'private') {
+                    return pinfo;
+                }
+            } else {
+                break;
+            }
+        }
+        return null;
     }
   
     private assert(cond: boolean, ast: BaseNode, message: string = null) {
