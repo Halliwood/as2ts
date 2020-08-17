@@ -145,7 +145,7 @@ function readDir(dirPath: string, phase: As2TsPhase) {
 }
 
 function doTranslateFile(filePath: string, phase: As2TsPhase) {
-    // if(filePath.indexOf('TitleCanUseTipView.as')<0) return;
+    // if(filePath.indexOf('HongBaoYouLiItem.as')<0) return;
     let relativePath = path.relative(inputFolder, filePath);
     if(transOption.skipRule && transOption.skipRule.files) {
         for(let sf of transOption.skipRule.files) {

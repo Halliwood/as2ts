@@ -159,7 +159,7 @@ function readDir(dirPath, phase) {
     }
 }
 function doTranslateFile(filePath, phase) {
-    // if(filePath.indexOf('TitleCanUseTipView.as')<0) return;
+    // if(filePath.indexOf('HongBaoYouLiItem.as')<0) return;
     var relativePath = path.relative(inputFolder, filePath);
     if (transOption.skipRule && transOption.skipRule.files) {
         for (var _i = 0, _a = transOption.skipRule.files; _i < _a.length; _i++) {

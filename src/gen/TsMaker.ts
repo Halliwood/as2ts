@@ -602,7 +602,13 @@ export class TsMaker {
         (ast.left as any).__parent = ast;
         (ast.right as any).__parent = ast;
         let left = this.codeFromAST(ast.left);
+        if (this.calPriority(ast.left) >= this.calPriority(ast)) {
+            left = '(' + left + ')';
+        }
         let right = this.codeFromAST(ast.right);
+        if (this.calPriority(ast.right) >= this.calPriority(ast)) {
+            right = '(' + right + ')';
+        }
 
         // if (optStr == 'in') {
         //     return right + '[' + left + ']';
@@ -635,6 +641,9 @@ export class TsMaker {
         let calleeStr = this.codeFromAST(ast.callee);
         if(this.option.methordMapper && this.option.methordMapper[calleeStr]) {
             calleeStr = this.option.methordMapper[calleeStr];
+        }
+        if(this.calPriority(ast.callee) > this.calPriority(ast)) {
+            calleeStr = '(' + calleeStr + ')';
         }
         let str = '';
         let allAgmStr = '';

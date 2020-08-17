@@ -476,7 +476,13 @@ var TsMaker = /** @class */ (function () {
         ast.left.__parent = ast;
         ast.right.__parent = ast;
         var left = this.codeFromAST(ast.left);
+        if (this.calPriority(ast.left) >= this.calPriority(ast)) {
+            left = '(' + left + ')';
+        }
         var right = this.codeFromAST(ast.right);
+        if (this.calPriority(ast.right) >= this.calPriority(ast)) {
+            right = '(' + right + ')';
+        }
         // if (optStr == 'in') {
         //     return right + '[' + left + ']';
         // }
@@ -504,6 +510,9 @@ var TsMaker = /** @class */ (function () {
         var calleeStr = this.codeFromAST(ast.callee);
         if (this.option.methordMapper && this.option.methordMapper[calleeStr]) {
             calleeStr = this.option.methordMapper[calleeStr];
+        }
+        if (this.calPriority(ast.callee) > this.calPriority(ast)) {
+            calleeStr = '(' + calleeStr + ')';
         }
         var str = '';
         var allAgmStr = '';
