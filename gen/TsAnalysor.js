@@ -16,6 +16,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.TsAnalysor = exports.ClassInfo = exports.FunctionInfo = exports.PropertyInfo = void 0;
 var typescript_estree_1 = require("@typescript-eslint/typescript-estree");
 var util = require("util");
+var Strings_1 = require("./Strings");
 var PropertyInfo = /** @class */ (function () {
     function PropertyInfo() {
     }
@@ -55,7 +56,7 @@ var ClassInfo = /** @class */ (function () {
         this.functionMap = {};
     }
     ClassInfo.prototype.toString = function () {
-        var str = this.module + '~' + this.name;
+        var str = this.module + '.' + this.name;
         for (var propertyName in this.propertyMap) {
             str += '|' + this.propertyMap[propertyName];
         }
@@ -72,15 +73,18 @@ var TsAnalysor = /** @class */ (function () {
         this.classMap = {};
         this.option = option || {};
     }
-    TsAnalysor.prototype.collect = function (ast, relativePath) {
+    TsAnalysor.prototype.collect = function (ast, fullPath, relativePath) {
+        this.fullPath = fullPath;
         this.relativePath = relativePath;
-        var modulePath = relativePath.replace(/\\/g, '/');
-        var pos = modulePath.lastIndexOf('/');
-        if (pos >= 0) {
-            this.module = modulePath.substring(0, pos + 1);
-        }
-        else {
-            this.module = '';
+        if (relativePath) {
+            var modulePath = relativePath.replace(/\\/g, '/');
+            var pos = modulePath.lastIndexOf('/');
+            if (pos >= 0) {
+                this.module = modulePath.substring(0, pos + 1);
+            }
+            else {
+                this.module = '';
+            }
         }
         this.processAST(ast);
     };
@@ -163,7 +167,7 @@ var TsAnalysor = /** @class */ (function () {
         var className = this.codeFromAST(ast.id);
         this.crtClass = new ClassInfo();
         this.crtClass.name = className;
-        this.crtClass.module = this.module;
+        this.crtClass.module = this.crtModule || this.module;
         this.classMap[className] = this.crtClass;
         if (ast.superClass)
             this.crtClass.superClass = this.codeFromAST(ast.superClass);
@@ -251,24 +255,48 @@ var TsAnalysor = /** @class */ (function () {
         }
     };
     TsAnalysor.prototype.processTSModuleDeclaration = function (ast) {
+        this.crtModule = this.codeFromAST(ast.id);
         if (ast.body) {
             this.processAST(ast.body);
         }
+        this.crtModule = null;
     };
     TsAnalysor.prototype.processTSInterfaceDeclaration = function (ast) {
         var className = this.codeFromAST(ast.id);
         this.crtClass = new ClassInfo();
         this.crtClass.name = className;
-        this.crtClass.module = this.module;
+        this.crtClass.module = this.crtModule || this.module;
         this.classMap[className] = this.crtClass;
     };
     TsAnalysor.prototype.codeFromAST = function (ast) {
-        if (ast.type == typescript_estree_1.AST_NODE_TYPES.Identifier) {
-            return ast.name;
+        var str = '';
+        switch (ast.type) {
+            case typescript_estree_1.AST_NODE_TYPES.Identifier:
+                str += this.codeFromIdentifier(ast);
+                break;
+            case typescript_estree_1.AST_NODE_TYPES.MemberExpression:
+                str += this.codeFromMemberExpression(ast);
+                break;
+            default:
+                this.assert(false, ast, '[ERROR]Analyse ast error, not support: ' + ast.type);
+                break;
+        }
+        return str;
+    };
+    TsAnalysor.prototype.codeFromIdentifier = function (ast) {
+        return ast.name;
+    };
+    TsAnalysor.prototype.codeFromMemberExpression = function (ast) {
+        var objStr = this.codeFromAST(ast.object);
+        var str = objStr;
+        var propertyStr = this.codeFromAST(ast.property);
+        if (ast.computed) {
+            str += '[' + propertyStr + ']';
         }
         else {
-            this.assert(false, ast, '[ERROR]Analyse ast error, not support: ' + ast.type);
+            str += '.' + propertyStr;
         }
+        return str;
     };
     TsAnalysor.prototype.assert = function (cond, ast, message) {
         if (message === void 0) { message = null; }
@@ -276,7 +304,8 @@ var TsAnalysor = /** @class */ (function () {
             if (this.option.errorDetail) {
                 console.log(util.inspect(ast, true, 6));
             }
-            console.log('\x1B[36m%s\x1B[0m(tmp/tmp.ts:\x1B[33m%d:%d\x1B[0m) - \x1B[31merror\x1B[0m: %s', this.relativePath, ast.loc.start.line, ast.loc.start.column, message ? message : 'Error');
+            console.log('\x1B[36m%s\x1B[0m\x1B[33m%d:%d\x1B[0m - \x1B[31merror\x1B[0m: %s', this.fullPath, ast.loc ? ast.loc.start.line : -1, ast.loc ? ast.loc.start.column : -1, message ? message : 'Error');
+            console.log(Strings_1.As2TsHints.ContactMsg);
             if (this.option.terminateWhenError) {
                 throw new Error('[As2TS]Something wrong encountered.');
             }

@@ -17,6 +17,8 @@ export interface As2TsOption {
     typeMapper?: {[key: string]: string}, 
     methordMapper?: {[key: string]: string}, 
     importRule?: As2TsImportRule, 
+    /**额外的typescript代码库，用于补充类库信息 */
+    tsLibs?: string[], 
     /**是否打印详细的错误信息 */
     errorDetail?: boolean, 
     /**是否在发生错误时立即终止 */

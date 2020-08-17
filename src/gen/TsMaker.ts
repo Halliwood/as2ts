@@ -1,9 +1,10 @@
-import { Accessibility, ArrayExpression, ArrayPattern, ArrowFunctionExpression, AssignmentExpression, AssignmentPattern, AwaitExpression, BigIntLiteral, BinaryExpression, BlockStatement, BreakStatement, CallExpression, CatchClause, ClassBody, ClassDeclaration, ClassExpression, ClassProperty, ConditionalExpression, ContinueStatement, DebuggerStatement, Decorator, DoWhileStatement, EmptyStatement, ExportAllDeclaration, ExportDefaultDeclaration, ExportNamedDeclaration, ExportSpecifier, ExpressionStatement, ForInStatement, ForOfStatement, ForStatement, FunctionDeclaration, FunctionExpression, Identifier, IfStatement, ImportDeclaration, ImportDefaultSpecifier, ImportNamespaceSpecifier, ImportSpecifier, LabeledStatement, Literal, LogicalExpression, MemberExpression, MetaProperty, MethodDefinition, NewExpression, ObjectExpression, ObjectPattern, Program, Property, RestElement, ReturnStatement, SequenceExpression, SpreadElement, Super, SwitchCase, SwitchStatement, TaggedTemplateExpression, TemplateElement, TemplateLiteral, ThisExpression, ThrowStatement, TryStatement, UnaryExpression, UpdateExpression, VariableDeclaration, VariableDeclarator, WhileStatement, WithStatement, YieldExpression, TSEnumDeclaration, BindingName, TSAsExpression, TSClassImplements, TSInterfaceDeclaration, TSTypeAssertion, TSModuleDeclaration, TSModuleBlock, TSDeclareFunction, TSAbstractMethodDefinition, TSInterfaceBody, TSMethodSignature, TSTypeAnnotation, TSTypeParameterInstantiation, TSTypeReference, TSVoidKeyword, BaseNode } from '@typescript-eslint/types/dist/ts-estree';
+import { Accessibility, ArrayExpression, ArrayPattern, ArrowFunctionExpression, AssignmentExpression, AssignmentPattern, AwaitExpression, BigIntLiteral, BinaryExpression, BlockStatement, BreakStatement, CallExpression, CatchClause, ClassBody, ClassDeclaration, ClassExpression, ClassProperty, ConditionalExpression, ContinueStatement, DebuggerStatement, Decorator, DoWhileStatement, EmptyStatement, ExportAllDeclaration, ExportDefaultDeclaration, ExportNamedDeclaration, ExportSpecifier, ExpressionStatement, ForInStatement, ForOfStatement, ForStatement, FunctionDeclaration, FunctionExpression, Identifier, IfStatement, ImportDeclaration, ImportDefaultSpecifier, ImportNamespaceSpecifier, ImportSpecifier, LabeledStatement, Literal, LogicalExpression, MemberExpression, MetaProperty, MethodDefinition, NewExpression, ObjectExpression, ObjectPattern, Program, Property, RestElement, ReturnStatement, SequenceExpression, SpreadElement, Super, SwitchCase, SwitchStatement, TaggedTemplateExpression, TemplateElement, TemplateLiteral, ThisExpression, ThrowStatement, TryStatement, UnaryExpression, UpdateExpression, VariableDeclaration, VariableDeclarator, WhileStatement, WithStatement, YieldExpression, TSEnumDeclaration, BindingName, TSAsExpression, TSClassImplements, TSInterfaceDeclaration, TSTypeAssertion, TSModuleDeclaration, TSModuleBlock, TSDeclareFunction, TSAbstractMethodDefinition, TSInterfaceBody, TSMethodSignature, TSParenthesizedType, TSTypeAnnotation, TSTypeParameterInstantiation, TSTypeReference, TSVoidKeyword, BaseNode } from '@typescript-eslint/types/dist/ts-estree';
 import { AST_NODE_TYPES } from '@typescript-eslint/typescript-estree';
 import { As2TsImportRule, As2TsOption } from '.';
 import util = require('util');
 import path = require('path');
 import {TsAnalysor, ClassInfo, FunctionInfo, PropertyInfo} from './TsAnalysor';
+import { As2TsHints } from './Strings';
 
 export class TsMaker {
     
@@ -157,7 +158,11 @@ export class TsMaker {
             if(!this.importedMap[type] && !this.isSimpleType(type)) {
                 let classInfo = this.analysor.classMap[type];
                 if(classInfo) {
-                    str = 'import {' + type + '} from "' + classInfo.module + type + '"\n' + str;
+                    let mstr = classInfo.module;
+                    if(mstr.charAt(mstr.length - 1) != '/') {
+                        mstr += '/';
+                    }
+                    str = 'import {' + type + '} from "' + mstr + type + '"\n' + str;
                 }                
             }
         }
@@ -443,6 +448,10 @@ export class TsMaker {
 
             case AST_NODE_TYPES.TSClassImplements:
                 str += this.codeFromTSClassImplements(ast);
+                break;
+
+            case AST_NODE_TYPES.TSParenthesizedType:
+                str += this.codeFromTSParenthesizedType(ast);
                 break;
 
             case AST_NODE_TYPES.UnaryExpression:
@@ -1087,10 +1096,10 @@ export class TsMaker {
         //     (ast.object as any).__addThis = true;
         // }
         let objStr = this.codeFromAST(ast.object);
-        let str = objStr;
-        if (this.calPriority(ast.object) > this.calPriority(ast)) {
-            str = '(' + str + ')';
+        if (AST_NODE_TYPES.TSAsExpression == (ast.object as any).type || this.calPriority(ast.object) > this.calPriority(ast)) {
+            objStr = '(' + objStr + ')';
         }
+        let str = objStr;
         (ast.property as any).__parent = ast;
         let propertyStr = this.codeFromAST(ast.property);
         if (ast.computed) {
@@ -1294,6 +1303,10 @@ export class TsMaker {
         return str;
     }
 
+    private codeFromTSParenthesizedType(ast: TSParenthesizedType): string {
+        return '(' + this.codeFromAST(ast.typeAnnotation) + ')';
+    }
+
     private codeFromUnaryExpression(ast: UnaryExpression): string {
         let str;
         let agm = this.codeFromAST(ast.argument);
@@ -1364,7 +1377,9 @@ export class TsMaker {
     }
 
     private codeFromTSAsExpression(ast: TSAsExpression): string {
-        return this.codeFromAST(ast.expression);
+        let str = this.codeFromAST(ast.expression);
+        str += ' as ' + this.codeFromAST(ast.typeAnnotation);
+        return str;
     }
 
     private codeFromTSDeclareFunction(ast: TSDeclareFunction): string {
@@ -1584,6 +1599,7 @@ export class TsMaker {
                 ast.loc ? ast.loc.start.line : -1, 
                 ast.loc ? ast.loc.start.column : -1, 
                 message ? message : 'Error');
+            console.log(As2TsHints.ContactMsg);
             if(this.option.terminateWhenError) {
                 throw new Error('[As2TS]Something wrong encountered.');
             }

@@ -64,6 +64,7 @@ var optionExample = {
             { "module": "GameConfig", "regular": new RegExp("^automatic/cfgs") }
         ]
     },
+    tsLibs: ["E:/qhgame/tsproj/src/ui/layaUI.max.all.ts"],
     errorDetail: true,
     terminateWhenError: true,
     continueLast: false,
@@ -81,6 +82,7 @@ var hasMeetLast;
 translateFiles('E:\\qhgame\\trunk\\project\\src\\', 'E:\\qhgame\\tsproj\\src\\', optionExample);
 /**不支持内联函数、函数语句、单行声明多个成员变量 */
 function translateFiles(inputPath, outputPath, option) {
+    var startAt = (new Date()).getTime();
     inputFolder = inputPath;
     outputFolder = outputPath;
     transOption = option || {};
@@ -116,6 +118,18 @@ function translateFiles(inputPath, outputPath, option) {
         tsAnalysor = new TsAnalysor_1.TsAnalysor(option);
         tsMaker = new TsMaker_1.TsMaker(tsAnalysor, option);
     }
+    if (transOption.tsLibs) {
+        for (var i = 0, len = transOption.tsLibs.length; i < len; i++) {
+            var tsPath = transOption.tsLibs[i];
+            var tsStat = fs.statSync(tsPath);
+            if (tsStat.isFile()) {
+                readLibFile(tsPath);
+            }
+            else {
+                readLibDir(tsPath);
+            }
+        }
+    }
     var inputStat = fs.statSync(inputPath);
     if (inputStat.isFile()) {
         doTranslateFile(inputPath, As2TsPhase.Analyse);
@@ -129,7 +143,8 @@ function translateFiles(inputPath, outputPath, option) {
         hasMeetLast = false;
         readDir(inputPath, As2TsPhase.Make);
     }
-    console.log('translation finished.');
+    var now = (new Date()).getTime();
+    console.log('translation finished, %2fs costed.', (now - startAt) / 1000);
 }
 exports.translateFiles = translateFiles;
 function readDir(dirPath, phase) {
@@ -197,7 +212,7 @@ function doTranslateFile(filePath, phase) {
                 fs.mkdirSync(tmpAstPP.dir, { recursive: true });
             fs.writeFileSync(tmpAstPath, JSON.stringify(ast));
         }
-        tsAnalysor.collect(ast, relativePath);
+        tsAnalysor.collect(ast, filePath, relativePath);
     }
     else {
         var outFilePath = filePath.replace(inputFolder, outputFolder);
@@ -210,6 +225,29 @@ function doTranslateFile(filePath, phase) {
             fs.mkdirSync(outFilePP.dir, { recursive: true });
         fs.writeFileSync(tsFilePath, tsContent);
     }
+}
+function readLibDir(dirPath) {
+    var files = fs.readdirSync(dirPath);
+    for (var i = 0, len = files.length; i < len; i++) {
+        var filename = files[i];
+        var filePath = path.join(dirPath, filename);
+        var fileStat = fs.statSync(filePath);
+        if (fileStat.isFile()) {
+            var fileExt = path.extname(filename).toLowerCase();
+            if ('.ts' == fileExt) {
+                readLibFile(filePath);
+            }
+        }
+        else {
+            readLibDir(filePath);
+        }
+    }
+}
+function readLibFile(filePath) {
+    var tsContent = fs.readFileSync(filePath, 'utf-8');
+    // 分析语法树
+    var ast = parser.parse(tsContent); //, {loc: true, range: true}
+    tsAnalysor.collect(ast, filePath);
 }
 function dumpAnalysor() {
     var analysorInfoPath = transOption.tmpRoot + '/analysor.txt';

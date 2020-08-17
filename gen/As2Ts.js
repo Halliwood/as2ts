@@ -33,7 +33,7 @@ var As2Ts = /** @class */ (function () {
             asContent = asContent.replace(ctorRe, 'constructor');
         }
         // 去掉final关键字
-        asContent = asContent.replace(/(?<!\w)final\s+/g, '');
+        asContent = asContent.replace(/\bfinal\b\s+/g, '');
         asContent = asContent.replace(/public\s+(?=(class|interface))/g, 'export ');
         // // 去掉package
         // let newAsContent = asContent.replace(/(?<!\w)package\s*[^\{]+\s*\{\s*/, '');
@@ -42,7 +42,7 @@ var As2Ts = /** @class */ (function () {
         //     asContent = asContent.replace(/\s*\}\s*$/, '');
         // }
         // package改成module
-        asContent = asContent.replace(/(?<!\w)package(?=[\s\{])/, 'module');
+        asContent = asContent.replace(/\bpackage\b(?=[\s\{])/, 'module');
         // 修改import
         var iptRe = new RegExp(/\s*import\s+([\w\.]+)\s?;*/);
         var asLines = asContent.split(/[\r\n]+/);

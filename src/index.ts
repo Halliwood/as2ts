@@ -46,6 +46,7 @@ let optionExample: As2TsOption = {
             {"module": "GameConfig", "regular": new RegExp("^automatic/cfgs") }
         ]
     }, 
+    tsLibs: ["E:/qhgame/tsproj/src/ui/layaUI.max.all.ts"], 
     errorDetail: true, 
     terminateWhenError: true, 
     continueLast: false, 
@@ -67,6 +68,7 @@ translateFiles('E:\\qhgame\\trunk\\project\\src\\', 'E:\\qhgame\\tsproj\\src\\',
 
 /**不支持内联函数、函数语句、单行声明多个成员变量 */
 export function translateFiles(inputPath: string, outputPath: string, option?: As2TsOption) {
+    let startAt = (new Date()).getTime();
     inputFolder = inputPath;
     outputFolder = outputPath;
     transOption = option || {};
@@ -104,6 +106,19 @@ export function translateFiles(inputPath: string, outputPath: string, option?: A
         tsMaker = new TsMaker(tsAnalysor, option);
     }
 
+    if(transOption.tsLibs) {
+        for(let i = 0, len = transOption.tsLibs.length; i < len; i++) {
+            let tsPath = transOption.tsLibs[i];
+
+            let tsStat = fs.statSync(tsPath);
+            if(tsStat.isFile()) {
+                readLibFile(tsPath);
+            } else {
+                readLibDir(tsPath);
+            }
+        }
+    }
+
     let inputStat = fs.statSync(inputPath);
     if(inputStat.isFile()) {
         doTranslateFile(inputPath, As2TsPhase.Analyse);
@@ -116,7 +131,8 @@ export function translateFiles(inputPath: string, outputPath: string, option?: A
         hasMeetLast = false;
         readDir(inputPath, As2TsPhase.Make);
     }
-    console.log('translation finished.');
+    let now = (new Date()).getTime();
+    console.log('translation finished, %.2fs costed.', (now - startAt) / 1000);
 }
 
 function readDir(dirPath: string, phase: As2TsPhase) {
@@ -182,7 +198,7 @@ function doTranslateFile(filePath: string, phase: As2TsPhase) {
             if (!fs.existsSync(tmpAstPP.dir)) fs.mkdirSync(tmpAstPP.dir, { recursive: true });
             fs.writeFileSync(tmpAstPath, JSON.stringify(ast));
         }
-        tsAnalysor.collect(ast, relativePath);
+        tsAnalysor.collect(ast, filePath, relativePath);
     } else {
         let outFilePath = filePath.replace(inputFolder, outputFolder);
         let tsFilePath = outFilePath.replace(/\.as$/, '.ts');
@@ -193,6 +209,30 @@ function doTranslateFile(filePath: string, phase: As2TsPhase) {
         if (!fs.existsSync(outFilePP.dir)) fs.mkdirSync(outFilePP.dir, { recursive: true });
         fs.writeFileSync(tsFilePath, tsContent);
     }
+}
+
+function readLibDir(dirPath: string) {
+    let files = fs.readdirSync(dirPath);
+    for(let i = 0, len = files.length; i < len; i++) {
+        let filename = files[i];
+        let filePath = path.join(dirPath, filename);
+        let fileStat = fs.statSync(filePath);
+        if (fileStat.isFile()) {
+            let fileExt = path.extname(filename).toLowerCase();
+            if ('.ts' == fileExt) {
+                readLibFile(filePath);
+            }
+        } else {
+            readLibDir(filePath);
+        }
+    }
+}
+
+function readLibFile(filePath: string) {
+    let tsContent = fs.readFileSync(filePath, 'utf-8');
+    // 分析语法树
+    const ast = parser.parse(tsContent); //, {loc: true, range: true}
+    tsAnalysor.collect(ast, filePath);
 }
 
 function dumpAnalysor() {

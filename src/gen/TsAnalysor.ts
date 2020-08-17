@@ -3,6 +3,7 @@ import { AST_NODE_TYPES } from '@typescript-eslint/typescript-estree';
 import { As2TsImportRule, As2TsOption } from '.';
 import util = require('util');
 import path = require('path');
+import {As2TsHints} from './Strings';
 
 export class PropertyInfo {
     name: string;
@@ -40,7 +41,7 @@ export class ClassInfo {
     functionMap: {[name: string]: FunctionInfo} = {};
 
     toString(): string {
-        let str = this.module + '~' + this.name;
+        let str = this.module + '.' + this.name;
         for(let propertyName in this.propertyMap) {
             str += '|' + this.propertyMap[propertyName];
         }
@@ -56,9 +57,11 @@ export class TsAnalysor {
     private option: As2TsOption;
 
     public classMap: {[name: string]: ClassInfo} = {};
+    private crtModule: string;
     private crtClass: ClassInfo;
     private crtFunc: FunctionInfo;
 
+    private fullPath: string;
     private relativePath: string;
     private module: string;
 
@@ -66,14 +69,17 @@ export class TsAnalysor {
         this.option = option || {};
     }
 
-    collect(ast: any, relativePath: string) {
+    collect(ast: any, fullPath: string, relativePath?: string) {
+        this.fullPath = fullPath;
         this.relativePath = relativePath;
-        let modulePath = relativePath.replace(/\\/g, '/');
-        let pos = modulePath.lastIndexOf('/');
-        if(pos >= 0) {
-            this.module = modulePath.substring(0, pos + 1);
-        } else {
-            this.module = '';
+        if(relativePath) {
+            let modulePath = relativePath.replace(/\\/g, '/');
+            let pos = modulePath.lastIndexOf('/');
+            if(pos >= 0) {
+                this.module = modulePath.substring(0, pos + 1);
+            } else {
+                this.module = '';
+            }
         }
         this.processAST(ast);
     }
@@ -177,7 +183,7 @@ export class TsAnalysor {
         let className = this.codeFromAST(ast.id);
         this.crtClass = new ClassInfo();
         this.crtClass.name = className;
-        this.crtClass.module = this.module;
+        this.crtClass.module = this.crtModule || this.module;
         this.classMap[className] = this.crtClass;
         if(ast.superClass) this.crtClass.superClass = this.codeFromAST(ast.superClass);
         
@@ -278,25 +284,53 @@ export class TsAnalysor {
     }
 
     private processTSModuleDeclaration(ast: TSModuleDeclaration) {
+        this.crtModule = this.codeFromAST(ast.id);
         if(ast.body) {
             this.processAST(ast.body);
         }
+        this.crtModule = null;
     }
 
     private processTSInterfaceDeclaration(ast: TSInterfaceDeclaration) {
         let className = this.codeFromAST(ast.id);
         this.crtClass = new ClassInfo();
         this.crtClass.name = className;
-        this.crtClass.module = this.module;
+        this.crtClass.module = this.crtModule || this.module;
         this.classMap[className] = this.crtClass;
     }
 
     private codeFromAST(ast: any): string {
-        if((ast as any).type == AST_NODE_TYPES.Identifier) {
-            return (ast as Identifier).name;
-        } else {
-            this.assert(false, ast, '[ERROR]Analyse ast error, not support: ' + (ast as any).type);
+        let str = '';
+        switch(ast.type) {
+            case AST_NODE_TYPES.Identifier:
+                str += this.codeFromIdentifier(ast);
+                break;
+
+            case AST_NODE_TYPES.MemberExpression:
+                str += this.codeFromMemberExpression(ast);
+                break;
+            
+            default:
+                this.assert(false, ast, '[ERROR]Analyse ast error, not support: ' + (ast as any).type);
+                break;
         }
+        return str;
+    }
+    
+    private codeFromIdentifier(ast: Identifier): string {
+        return ast.name;
+    }
+
+    private codeFromMemberExpression(ast: MemberExpression): string {
+        let objStr = this.codeFromAST(ast.object);
+        let str = objStr;
+        let propertyStr = this.codeFromAST(ast.property);
+        if (ast.computed) {
+            str += '[' + propertyStr + ']';
+        } else {
+            str += '.' + propertyStr;
+        }
+        return str;
     }
   
     private assert(cond: boolean, ast: BaseNode, message: string = null) {
@@ -304,7 +338,8 @@ export class TsAnalysor {
             if (this.option.errorDetail) {
                 console.log(util.inspect(ast, true, 6));
             }
-            console.log('\x1B[36m%s\x1B[0m(tmp/tmp.ts:\x1B[33m%d:%d\x1B[0m) - \x1B[31merror\x1B[0m: %s', this.relativePath, ast.loc.start.line, ast.loc.start.column, message ? message : 'Error');
+            console.log('\x1B[36m%s\x1B[0m\x1B[33m%d:%d\x1B[0m - \x1B[31merror\x1B[0m: %s', this.fullPath, ast.loc ? ast.loc.start.line : -1, ast.loc ? ast.loc.start.column : -1, message ? message : 'Error');
+            console.log(As2TsHints.ContactMsg);
             if(this.option.terminateWhenError) {
                 throw new Error('[As2TS]Something wrong encountered.');
             }

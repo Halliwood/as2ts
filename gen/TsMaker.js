@@ -3,6 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.TsMaker = void 0;
 var typescript_estree_1 = require("@typescript-eslint/typescript-estree");
 var util = require("util");
+var Strings_1 = require("./Strings");
 var TsMaker = /** @class */ (function () {
     function TsMaker(analysor, option) {
         // 运算符优先级
@@ -127,7 +128,11 @@ var TsMaker = /** @class */ (function () {
             if (!this.importedMap[type] && !this.isSimpleType(type)) {
                 var classInfo = this.analysor.classMap[type];
                 if (classInfo) {
-                    str = 'import {' + type + '} from "' + classInfo.module + type + '"\n' + str;
+                    var mstr = classInfo.module;
+                    if (mstr.charAt(mstr.length - 1) != '/') {
+                        mstr += '/';
+                    }
+                    str = 'import {' + type + '} from "' + mstr + type + '"\n' + str;
                 }
             }
         }
@@ -347,6 +352,9 @@ var TsMaker = /** @class */ (function () {
                 break;
             case typescript_estree_1.AST_NODE_TYPES.TSClassImplements:
                 str += this.codeFromTSClassImplements(ast);
+                break;
+            case typescript_estree_1.AST_NODE_TYPES.TSParenthesizedType:
+                str += this.codeFromTSParenthesizedType(ast);
                 break;
             case typescript_estree_1.AST_NODE_TYPES.UnaryExpression:
                 str += this.codeFromUnaryExpression(ast);
@@ -931,10 +939,10 @@ var TsMaker = /** @class */ (function () {
         //     (ast.object as any).__addThis = true;
         // }
         var objStr = this.codeFromAST(ast.object);
-        var str = objStr;
-        if (this.calPriority(ast.object) > this.calPriority(ast)) {
-            str = '(' + str + ')';
+        if (typescript_estree_1.AST_NODE_TYPES.TSAsExpression == ast.object.type || this.calPriority(ast.object) > this.calPriority(ast)) {
+            objStr = '(' + objStr + ')';
         }
+        var str = objStr;
         ast.property.__parent = ast;
         var propertyStr = this.codeFromAST(ast.property);
         if (ast.computed) {
@@ -1118,6 +1126,9 @@ var TsMaker = /** @class */ (function () {
         }
         return str;
     };
+    TsMaker.prototype.codeFromTSParenthesizedType = function (ast) {
+        return '(' + this.codeFromAST(ast.typeAnnotation) + ')';
+    };
     TsMaker.prototype.codeFromUnaryExpression = function (ast) {
         var str;
         var agm = this.codeFromAST(ast.argument);
@@ -1182,7 +1193,9 @@ var TsMaker = /** @class */ (function () {
         return this.codeFromMethodDefinition(ast);
     };
     TsMaker.prototype.codeFromTSAsExpression = function (ast) {
-        return this.codeFromAST(ast.expression);
+        var str = this.codeFromAST(ast.expression);
+        str += ' as ' + this.codeFromAST(ast.typeAnnotation);
+        return str;
     };
     TsMaker.prototype.codeFromTSDeclareFunction = function (ast) {
         this.assert(false, ast, 'Not support TSDeclareFunction yet');
@@ -1387,6 +1400,7 @@ var TsMaker = /** @class */ (function () {
                 console.log(util.inspect(ast, true, 6));
             }
             console.log('\x1B[36m%s\x1B[0m(tmp/tmp.ts:\x1B[33m%d:%d\x1B[0m) - \x1B[31merror\x1B[0m: %s', this.relativePath, ast.loc ? ast.loc.start.line : -1, ast.loc ? ast.loc.start.column : -1, message ? message : 'Error');
+            console.log(Strings_1.As2TsHints.ContactMsg);
             if (this.option.terminateWhenError) {
                 throw new Error('[As2TS]Something wrong encountered.');
             }
