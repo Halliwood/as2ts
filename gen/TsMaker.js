@@ -10,7 +10,7 @@ var TsMaker = /** @class */ (function () {
         this.pv = 0;
         this.operatorPriorityMap = {};
         this.simpleTypes = ['number', 'string', 'boolean', 'any', 'Array', '[]', 'Object', 'void'];
-        this.parentNoThis = [typescript_estree_1.AST_NODE_TYPES.MemberExpression, typescript_estree_1.AST_NODE_TYPES.Property, typescript_estree_1.AST_NODE_TYPES.VariableDeclarator];
+        this.parentNoThis = [typescript_estree_1.AST_NODE_TYPES.Property, typescript_estree_1.AST_NODE_TYPES.VariableDeclarator];
         this.analysor = analysor;
         this.option = option || {};
         this.setPriority(['( … )'], this.pv++);
@@ -806,7 +806,8 @@ var TsMaker = /** @class */ (function () {
         if (this.option.idReplacement && typeof (this.option.idReplacement[str]) === 'string') {
             str = this.option.idReplacement[str];
         }
-        if (this.startAddThis && (!ast.__parent || this.parentNoThis.indexOf(ast.__parent.type) < 0) && null != this.crtClass && null != this.crtFunc) {
+        if (this.startAddThis && null != this.crtClass && null != this.crtFunc &&
+            (!ast.__parent || this.parentNoThis.indexOf(ast.__parent.type) < 0 && (ast.__parent.type != typescript_estree_1.AST_NODE_TYPES.MemberExpression || ast.__parent.computed))) {
             if (this.crtFunc.params.indexOf(str) < 0) {
                 var minfo = this.getMemberInfo(this.crtClass, str);
                 if (minfo) {

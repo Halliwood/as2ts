@@ -16,7 +16,7 @@ export class TsMaker {
     private option: As2TsOption;
     private analysor: TsAnalysor;
     private readonly simpleTypes: string[] = ['number', 'string', 'boolean', 'any', 'Array', '[]', 'Object', 'void'];
-    private readonly parentNoThis = [AST_NODE_TYPES.MemberExpression, AST_NODE_TYPES.Property, AST_NODE_TYPES.VariableDeclarator];
+    private readonly parentNoThis = [AST_NODE_TYPES.Property, AST_NODE_TYPES.VariableDeclarator];
 
     private relativePath: string;
     private crtClass: ClassInfo;
@@ -963,7 +963,8 @@ export class TsMaker {
         if(this.option.idReplacement && typeof(this.option.idReplacement[str]) === 'string') {
             str = this.option.idReplacement[str];
         }
-        if(this.startAddThis && (!(ast as any).__parent || this.parentNoThis.indexOf((ast as any).__parent.type) < 0) && null != this.crtClass && null != this.crtFunc) {
+        if(this.startAddThis && null != this.crtClass && null != this.crtFunc && 
+            (!(ast as any).__parent || this.parentNoThis.indexOf((ast as any).__parent.type) < 0 && ((ast as any).__parent.type != AST_NODE_TYPES.MemberExpression || ((ast as any).__parent as MemberExpression).computed))) {
             if(this.crtFunc.params.indexOf(str) < 0) {
                 let minfo = this.getMemberInfo(this.crtClass, str);
                 if(minfo) {

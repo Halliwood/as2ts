@@ -144,7 +144,7 @@ function translateFiles(inputPath, outputPath, option) {
         readDir(inputPath, As2TsPhase.Make);
     }
     var now = (new Date()).getTime();
-    console.log('translation finished, %2fs costed.', (now - startAt) / 1000);
+    console.log('translation finished, %.2fs costed.', (now - startAt) / 1000);
 }
 exports.translateFiles = translateFiles;
 function readDir(dirPath, phase) {
