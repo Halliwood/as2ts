@@ -16,8 +16,8 @@ let tsAnalysor: TsAnalysor;
 let tsMaker: TsMaker;
 let optionExample: As2TsOption = {
     skipRule: {
-        "dirs": [/^ui\//, /^automatic/], 
-        "files": [/MsgPool\.as/, /FyMsg\.as/, /DecodeUtil\.as/, /EncodeUtil\.as/]
+        "dirs": [/^\bui\b/, /^automatic/], 
+        "files": [/MsgPool\.as/, /FyMsg\.as/, /DecodeUtil\.as/, /EncodeUtil\.as/, /SendMsgUtil\.as/]
     }, 
     idReplacement: {
         "KW": "KeyWord"
@@ -35,7 +35,10 @@ let optionExample: As2TsOption = {
     }, 
     importRule: {
         "fromModule": [
-            {"module": "Laya", "regular": new RegExp("^laya") }
+            {"module": "Laya", "regular": new RegExp("^laya") }, 
+            {"module": "ui", "regular": new RegExp("^ui/") }, 
+            {"module": "Protocol", "regular": new RegExp("^automatic/protocol/(?!Macros|ErrorId)") }, 
+            {"module": "GameConfig", "regular": new RegExp("^automatic/cfgs") }
         ]
     }, 
     errorDetail: true, 
@@ -133,7 +136,7 @@ function readDir(dirPath: string, phase: As2TsPhase) {
 }
 
 function doTranslateFile(filePath: string, phase: As2TsPhase) {
-    // if(filePath.indexOf('GameConfig.as')<0) return;
+    // if(filePath.indexOf('TitleCanUseTipView.as')<0) return;
     let relativePath = path.relative(inputFolder, filePath);
     if(transOption.skipRule && transOption.skipRule.files) {
         for(let sf of transOption.skipRule.files) {
@@ -164,7 +167,7 @@ function doTranslateFile(filePath: string, phase: As2TsPhase) {
         }
     
         // 分析语法树
-        const ast = parser.parse(tsContent, {loc: true, range: true});
+        const ast = parser.parse(tsContent); //, {loc: true, range: true}
         if(transOption.tmpRoot) {
             let tmpAstPP = path.parse(tmpAstPath);
             if (!fs.existsSync(tmpAstPP.dir)) fs.mkdirSync(tmpAstPP.dir, { recursive: true });

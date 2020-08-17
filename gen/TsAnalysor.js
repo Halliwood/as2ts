@@ -55,7 +55,7 @@ var ClassInfo = /** @class */ (function () {
         this.functionMap = {};
     }
     ClassInfo.prototype.toString = function () {
-        var str = this.name;
+        var str = this.module + '~' + this.name;
         for (var propertyName in this.propertyMap) {
             str += '|' + this.propertyMap[propertyName];
         }
@@ -74,6 +74,14 @@ var TsAnalysor = /** @class */ (function () {
     }
     TsAnalysor.prototype.collect = function (ast, relativePath) {
         this.relativePath = relativePath;
+        var modulePath = relativePath.replace(/\\/g, '/');
+        var pos = modulePath.lastIndexOf('/');
+        if (pos >= 0) {
+            this.module = modulePath.substring(0, pos + 1);
+        }
+        else {
+            this.module = '';
+        }
         this.processAST(ast);
     };
     TsAnalysor.prototype.processAST = function (ast) {
@@ -152,6 +160,7 @@ var TsAnalysor = /** @class */ (function () {
         var className = this.codeFromAST(ast.id);
         this.crtClass = new ClassInfo();
         this.crtClass.name = className;
+        this.crtClass.module = this.module;
         this.classMap[className] = this.crtClass;
         if (ast.superClass)
             this.crtClass.superClass = this.codeFromAST(ast.superClass);

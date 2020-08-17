@@ -34,12 +34,13 @@ export class FunctionInfo extends PropertyInfo {
 export class ClassInfo {
     name: string;
     superClass: string;
+    module: string;
     propertyMap: {[name: string]: PropertyInfo} = {};
     privateProperties: string[] = [];
     functionMap: {[name: string]: FunctionInfo} = {};
 
     toString(): string {
-        let str = this.name;
+        let str = this.module + '~' + this.name;
         for(let propertyName in this.propertyMap) {
             str += '|' + this.propertyMap[propertyName];
         }
@@ -59,6 +60,7 @@ export class TsAnalysor {
     private crtFunc: FunctionInfo;
 
     private relativePath: string;
+    private module: string;
 
     constructor(option: As2TsOption) {
         this.option = option || {};
@@ -66,6 +68,13 @@ export class TsAnalysor {
 
     collect(ast: any, relativePath: string) {
         this.relativePath = relativePath;
+        let modulePath = relativePath.replace(/\\/g, '/');
+        let pos = modulePath.lastIndexOf('/');
+        if(pos >= 0) {
+            this.module = modulePath.substring(0, pos + 1);
+        } else {
+            this.module = '';
+        }
         this.processAST(ast);
     }
 
@@ -164,6 +173,7 @@ export class TsAnalysor {
         let className = this.codeFromAST(ast.id);
         this.crtClass = new ClassInfo();
         this.crtClass.name = className;
+        this.crtClass.module = this.module;
         this.classMap[className] = this.crtClass;
         if(ast.superClass) this.crtClass.superClass = this.codeFromAST(ast.superClass);
         

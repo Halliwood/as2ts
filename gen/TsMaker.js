@@ -3,14 +3,13 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.TsMaker = void 0;
 var typescript_estree_1 = require("@typescript-eslint/typescript-estree");
 var util = require("util");
-var path = require("path");
 var TsMaker = /** @class */ (function () {
     function TsMaker(analysor, option) {
         // 运算符优先级
         this.pv = 0;
         this.operatorPriorityMap = {};
         this.simpleTypes = ['number', 'string', 'boolean', 'any', 'Array', '[]', 'Object', 'void'];
-        this.parentNoThis = [typescript_estree_1.AST_NODE_TYPES.MemberExpression, typescript_estree_1.AST_NODE_TYPES.VariableDeclarator];
+        this.parentNoThis = [typescript_estree_1.AST_NODE_TYPES.MemberExpression, typescript_estree_1.AST_NODE_TYPES.Property, typescript_estree_1.AST_NODE_TYPES.VariableDeclarator];
         this.analysor = analysor;
         this.option = option || {};
         this.setPriority(['( … )'], this.pv++);
@@ -123,12 +122,13 @@ var TsMaker = /** @class */ (function () {
         this.importedMap = {};
         this.relativePath = relativePath;
         var str = this.codeFromAST(ast);
-        var relativePP = path.parse(relativePath);
-        var modulePath = relativePP.dir.replace('\\', '/') + '/';
         for (var i = 0, len = this.allTypes.length; i < len; i++) {
             var type = this.allTypes[i];
             if (!this.importedMap[type] && !this.isSimpleType(type)) {
-                str = 'import {' + type + '} from "' + modulePath + type + '"\n' + str;
+                var classInfo = this.analysor.classMap[type];
+                if (classInfo) {
+                    str = 'import {' + type + '} from "' + classInfo.module + type + '"\n' + str;
+                }
             }
         }
         return str;
@@ -757,7 +757,7 @@ var TsMaker = /** @class */ (function () {
             }
         }
         str += ')';
-        if (ast.returnType) {
+        if (ast.returnType && kind != 'set') {
             str += ': ' + this.codeFromAST(ast.returnType);
         }
         str += ' {\n';
@@ -798,6 +798,14 @@ var TsMaker = /** @class */ (function () {
                     }
                     else {
                         str = 'this.' + str;
+                    }
+                }
+                else if (this.analysor.classMap[str]) {
+                    var mapped = this.option.typeMapper[str];
+                    if (mapped)
+                        str = mapped;
+                    if (this.allTypes.indexOf(str) < 0) {
+                        this.allTypes.push(str);
                     }
                 }
             }
@@ -992,7 +1000,7 @@ var TsMaker = /** @class */ (function () {
         return this.codeFromAST(ast.key) + ': ' + this.codeFromAST(ast.value);
     };
     TsMaker.prototype.codeFromRestElement = function (ast) {
-        return '...';
+        return '...' + this.codeFromAST(ast.argument);
     };
     TsMaker.prototype.codeFromReturnStatement = function (ast) {
         var str = 'return';
@@ -1005,7 +1013,7 @@ var TsMaker = /** @class */ (function () {
         var str = '';
         for (var i = 0, len = ast.expressions.length; i < len; i++) {
             if (i > 0) {
-                str += '; ';
+                str += ', ';
             }
             str += this.codeFromAST(ast.expressions[i]);
         }
@@ -1362,7 +1370,7 @@ var TsMaker = /** @class */ (function () {
             if (this.option.errorDetail) {
                 console.log(util.inspect(ast, true, 6));
             }
-            console.log('\x1B[36m%s\x1B[0m(tmp/tmp.ts:\x1B[33m%d:%d\x1B[0m) - \x1B[31merror\x1B[0m: %s', this.relativePath, ast.loc.start.line, ast.loc.start.column, message ? message : 'Error');
+            console.log('\x1B[36m%s\x1B[0m(tmp/tmp.ts:\x1B[33m%d:%d\x1B[0m) - \x1B[31merror\x1B[0m: %s', this.relativePath, ast.loc ? ast.loc.start.line : -1, ast.loc ? ast.loc.start.column : -1, message ? message : 'Error');
             if (this.option.terminateWhenError) {
                 throw new Error('[As2TS]Something wrong encountered.');
             }

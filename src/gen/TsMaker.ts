@@ -15,7 +15,7 @@ export class TsMaker {
     private option: As2TsOption;
     private analysor: TsAnalysor;
     private readonly simpleTypes: string[] = ['number', 'string', 'boolean', 'any', 'Array', '[]', 'Object', 'void'];
-    private readonly parentNoThis = [AST_NODE_TYPES.MemberExpression, AST_NODE_TYPES.VariableDeclarator];
+    private readonly parentNoThis = [AST_NODE_TYPES.MemberExpression, AST_NODE_TYPES.Property, AST_NODE_TYPES.VariableDeclarator];
 
     private relativePath: string;
     private crtClass: ClassInfo;
@@ -152,12 +152,13 @@ export class TsMaker {
         this.relativePath = relativePath;
         let str = this.codeFromAST(ast);
 
-        let relativePP = path.parse(relativePath);
-        let modulePath = relativePP.dir.replace('\\', '/') + '/';
         for(let i = 0, len = this.allTypes.length; i < len; i++) {
             let type = this.allTypes[i];
             if(!this.importedMap[type] && !this.isSimpleType(type)) {
-                str = 'import {' + type + '} from "' + modulePath + type + '"\n' + str;
+                let classInfo = this.analysor.classMap[type];
+                if(classInfo) {
+                    str = 'import {' + type + '} from "' + classInfo.module + type + '"\n' + str;
+                }                
             }
         }
         return str;
@@ -912,7 +913,7 @@ export class TsMaker {
             }
         }
         str += ')';
-        if(ast.returnType) {
+        if(ast.returnType && kind != 'set') {
             str += ': ' + this.codeFromAST(ast.returnType);
         }
         str += ' {\n';
@@ -953,6 +954,12 @@ export class TsMaker {
                         str = minfo.className + '.' + str;
                     } else {
                         str = 'this.' + str;
+                    }
+                } else if(this.analysor.classMap[str]) {
+                    let mapped = this.option.typeMapper[str];
+                    if(mapped) str = mapped;
+                    if(this.allTypes.indexOf(str) < 0) {
+                        this.allTypes.push(str);
                     }
                 }
             }
@@ -1159,7 +1166,7 @@ export class TsMaker {
     }
 
     private codeFromRestElement(ast: RestElement): string {
-        return '...';
+        return '...' + this.codeFromAST(ast.argument);
     }
 
     private codeFromReturnStatement(ast: ReturnStatement): string {
@@ -1174,7 +1181,7 @@ export class TsMaker {
         let str = '';
         for (var i = 0, len = ast.expressions.length; i < len; i++) {
             if (i > 0) {
-                str += '; ';
+                str += ', ';
             }
             str += this.codeFromAST(ast.expressions[i]);
         }
@@ -1560,7 +1567,10 @@ export class TsMaker {
             if (this.option.errorDetail) {
                 console.log(util.inspect(ast, true, 6));
             }
-            console.log('\x1B[36m%s\x1B[0m(tmp/tmp.ts:\x1B[33m%d:%d\x1B[0m) - \x1B[31merror\x1B[0m: %s', this.relativePath, ast.loc.start.line, ast.loc.start.column, message ? message : 'Error');
+            console.log('\x1B[36m%s\x1B[0m(tmp/tmp.ts:\x1B[33m%d:%d\x1B[0m) - \x1B[31merror\x1B[0m: %s', this.relativePath, 
+                ast.loc ? ast.loc.start.line : -1, 
+                ast.loc ? ast.loc.start.column : -1, 
+                message ? message : 'Error');
             if(this.option.terminateWhenError) {
                 throw new Error('[As2TS]Something wrong encountered.');
             }
