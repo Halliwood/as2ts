@@ -1,10 +1,10 @@
 {
   "name": "as2ts-smart",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "An useful tool to translate actionscript code to typescript.",
   "main": "bin/index.js",
   "scripts": {
-    "test": "tsc && node bin/index.js -s E:\\qhgame\\trunk\\project\\src\\ --dist E:\\qhgame\\tsproj\\src\\ -r example\\rule.json", 
+    "test": "tsc && node bin/index.js -s E:\\qhgame\\trunk\\project\\src\\ --dist E:\\qhgame\\tsproj\\src\\ -r example\\rule.json",
     "build": "tsc",
     "release": "tsc && npm config set registry=http://registry.npmjs.org && npm publish && npm config set registry=https://registry.npm.taobao.org/"
   },
