@@ -1,7 +1,10 @@
 "use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
-var Main_1 = require("./Main");
 var program = require("commander");
+var Main_1 = __importDefault(require("./Main"));
 var myPackage = require("../package.json");
 // for exmaple
 // as2ts 'E:\\qhgame\\trunk\\project\\src\\' 'E:\\qhgame\\tsproj\\src\\' 'example\\rule.json'
@@ -19,5 +22,5 @@ if (!program.dist) {
     console.warn("--dist option is MUST.");
     program.help();
 }
-var main = new Main_1.as2ts.Main();
+var main = new Main_1.default();
 main.translateFiles(program.src, program.dist, program.rule);

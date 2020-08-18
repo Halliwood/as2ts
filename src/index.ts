@@ -1,5 +1,5 @@
-import { as2ts } from './Main';
 import program = require("commander");
+import Main from "./Main";
 
 var myPackage = require("../package.json");
 
@@ -21,5 +21,5 @@ if(!(<any>program).dist) {
     program.help();
 }
 
-let main = new as2ts.Main();
+let main = new Main();
 main.translateFiles((<any>program).src, (<any>program).dist, (<any>program).rule);

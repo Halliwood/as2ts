@@ -28,3 +28,7 @@ export interface As2TsOption {
     /**临时文件缓存目录 */
     tmpRoot?: string
 }
+
+export class Main {
+    translateFiles(inputPath: string, outputPath: string, ruleFilePath?: string);
+}
