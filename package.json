@@ -20,6 +20,7 @@
     "translation"
   ],
   "author": "teppei",
+  "bin": "bin/as2ts-smart",
   "license": "ISC",
   "bugs": {
     "url": "https://github.com/Halliwood/as2ts/issues"
