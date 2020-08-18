@@ -1,35 +1,18 @@
-import { Accessibility, ArrayExpression, ArrayPattern, ArrowFunctionExpression, AssignmentExpression, AssignmentPattern, AwaitExpression, BigIntLiteral, BinaryExpression, BlockStatement, BreakStatement, CallExpression, CatchClause, ClassBody, ClassDeclaration, ClassExpression, ClassProperty, ConditionalExpression, ContinueStatement, DebuggerStatement, Decorator, DoWhileStatement, EmptyStatement, ExportAllDeclaration, ExportDefaultDeclaration, ExportNamedDeclaration, ExportSpecifier, ExpressionStatement, ForInStatement, ForOfStatement, ForStatement, FunctionDeclaration, FunctionExpression, Identifier, IfStatement, ImportDeclaration, ImportDefaultSpecifier, ImportNamespaceSpecifier, ImportSpecifier, LabeledStatement, Literal, LogicalExpression, MemberExpression, MetaProperty, MethodDefinition, NewExpression, ObjectExpression, ObjectPattern, Program, Property, RestElement, ReturnStatement, SequenceExpression, SpreadElement, Super, SwitchCase, SwitchStatement, TaggedTemplateExpression, TemplateElement, TemplateLiteral, ThisExpression, ThrowStatement, TryStatement, UnaryExpression, UpdateExpression, VariableDeclaration, VariableDeclarator, WhileStatement, WithStatement, YieldExpression, TSEnumDeclaration, BindingName, TSAsExpression, TSClassImplements, TSInterfaceDeclaration, TSTypeAssertion, TSModuleDeclaration, TSModuleBlock, TSDeclareFunction, TSAbstractMethodDefinition, TSInterfaceBody, TSMethodSignature, TSParenthesizedType, TSTypeAnnotation, TSTypeParameterInstantiation, TSTypeReference, TSVoidKeyword, BaseNode } from '@typescript-eslint/types/dist/ts-estree';
-import { AST_NODE_TYPES } from '@typescript-eslint/typescript-estree';
-import { As2TsOption } from './as2tsOptions';
-import util = require('util');
-import path = require('path');
-import {TsAnalysor, ClassInfo, FunctionInfo, PropertyInfo} from './TsAnalysor';
-import { As2TsHints } from './Strings';
-
-export class TsMaker {
-    
-    // 运算符优先级
-    private pv = 0;
-    private readonly operatorPriorityMap: {[key: string]: number} = {};
-
-    // 选项
-    private option: As2TsOption;
-    private analysor: TsAnalysor;
-    private readonly simpleTypes: string[] = ['number', 'string', 'boolean', 'any', 'Array', '[]', 'Object', 'void'];
-    private readonly parentNoThis = [AST_NODE_TYPES.Property, AST_NODE_TYPES.VariableDeclarator];
-
-    private relativePath: string;
-    private crtClass: ClassInfo;
-    private crtFunc: FunctionInfo;
-
-    private importedMap: {[key: string]: boolean};
-    private allTypes: string[];
-    private startAddThis: boolean;
-
-    constructor(analysor: TsAnalysor, option: As2TsOption) {
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.TsMaker = void 0;
+var typescript_estree_1 = require("@typescript-eslint/typescript-estree");
+var util = require("util");
+var Strings_1 = require("./Strings");
+var TsMaker = /** @class */ (function () {
+    function TsMaker(analysor, option) {
+        // 运算符优先级
+        this.pv = 0;
+        this.operatorPriorityMap = {};
+        this.simpleTypes = ['number', 'string', 'boolean', 'any', 'Array', '[]', 'Object', 'void'];
+        this.parentNoThis = [typescript_estree_1.AST_NODE_TYPES.Property, typescript_estree_1.AST_NODE_TYPES.VariableDeclarator];
         this.analysor = analysor;
         this.option = option || {};
-
         this.setPriority(['( … )'], this.pv++);
         this.setPriority(['… . …', '… [ … ]', 'new … ( … )', '… ( … )'], this.pv++);
         this.setPriority(['new …'], this.pv++);
@@ -52,123 +35,109 @@ export class TsMaker {
         this.setPriority(['...'], this.pv++);
         this.setPriority(['… , …'], this.pv++);
     }
-        
-    private setPriority(keys: string[], value: number) {
-        for(let i = 0, len = keys.length; i < len; i++) {
+    TsMaker.prototype.setPriority = function (keys, value) {
+        for (var i = 0, len = keys.length; i < len; i++) {
             this.operatorPriorityMap[keys[i]] = value;
         }
-    }
-  
-    private getPriority(raw: string) {
-        let idx = this.operatorPriorityMap[raw];
+    };
+    TsMaker.prototype.getPriority = function (raw) {
+        var idx = this.operatorPriorityMap[raw];
         if (idx < 0) {
             idx = 999;
             console.error('no prioritys: ' + raw);
         }
         return idx;
-    }
-
-    private calPriority(ast: any) {
+    };
+    TsMaker.prototype.calPriority = function (ast) {
         if ('__calPriority' in ast) {
             return ast.__calPriority;
         }
         switch (ast.type) {
-            case AST_NODE_TYPES.UnaryExpression:
+            case typescript_estree_1.AST_NODE_TYPES.UnaryExpression:
                 {
-                    let ue = ast as UnaryExpression;
+                    var ue = ast;
                     ast.__calPriority = this.getPriority(ue.prefix ? ue.operator + ' …' : '… ' + ue.operator);
                 }
                 break;
-
-            case AST_NODE_TYPES.UpdateExpression:
+            case typescript_estree_1.AST_NODE_TYPES.UpdateExpression:
                 {
-                    let ue = ast as UpdateExpression;
+                    var ue = ast;
                     ast.__calPriority = this.getPriority(ue.prefix ? ue.operator + ' …' : '… ' + ue.operator);
                 }
                 break;
-
-            case AST_NODE_TYPES.BinaryExpression:
+            case typescript_estree_1.AST_NODE_TYPES.BinaryExpression:
                 {
-                    let be = ast as BinaryExpression;
+                    var be = ast;
                     ast.__calPriority = this.getPriority('… ' + be.operator + ' …');
                 }
                 break;
-
-            case AST_NODE_TYPES.AssignmentExpression:
+            case typescript_estree_1.AST_NODE_TYPES.AssignmentExpression:
                 {
-                    let ae = ast as AssignmentExpression;
+                    var ae = ast;
                     ast.__calPriority = this.getPriority('… ' + ae.operator + ' …');
                 }
                 break;
-
-            case AST_NODE_TYPES.LogicalExpression:
+            case typescript_estree_1.AST_NODE_TYPES.LogicalExpression:
                 {
-                    let le = ast as LogicalExpression;
+                    var le = ast;
                     ast.__calPriority = this.getPriority('… ' + le.operator + ' …');
                 }
                 break;
-
-            case AST_NODE_TYPES.MemberExpression:
+            case typescript_estree_1.AST_NODE_TYPES.MemberExpression:
                 {
-                    let me = ast as MemberExpression;
+                    var me = ast;
                     ast.__calPriority = this.getPriority(me.computed ? '… [ … ]' : '… . …');
                 }
                 break;
-
-            case AST_NODE_TYPES.ConditionalExpression:
+            case typescript_estree_1.AST_NODE_TYPES.ConditionalExpression:
                 {
                     ast.__calPriority = this.getPriority('… ? … : …');
                 }
                 break;
-
-            case AST_NODE_TYPES.CallExpression:
+            case typescript_estree_1.AST_NODE_TYPES.CallExpression:
                 {
                     ast.__calPriority = this.getPriority('… ( … )');
                 }
                 break;
-
-            case AST_NODE_TYPES.NewExpression:
+            case typescript_estree_1.AST_NODE_TYPES.NewExpression:
                 {
-                    let ne = ast as NewExpression;
+                    var ne = ast;
                     if (ne.arguments.length > 0) {
                         ast.__calPriority = this.getPriority('new … ( … )');
-                    } else {
+                    }
+                    else {
                         ast.__calPriority = this.getPriority('new …');
                     }
                 }
                 break;
-
-            case AST_NODE_TYPES.SequenceExpression:
+            case typescript_estree_1.AST_NODE_TYPES.SequenceExpression:
                 {
                     ast.__calPriority = this.getPriority('… , …');
                 }
                 break;
         }
         return ast.__calPriority;
-    }
-
-    make(ast: any, relativePath: string): string {
+    };
+    TsMaker.prototype.make = function (ast, relativePath) {
         this.allTypes = [];
         this.importedMap = {};
         this.relativePath = relativePath;
-        let str = this.codeFromAST(ast);
-
-        for(let i = 0, len = this.allTypes.length; i < len; i++) {
-            let type = this.allTypes[i];
-            if(!this.importedMap[type] && !this.isSimpleType(type)) {
-                let classInfo = this.analysor.classMap[type];
-                if(classInfo) {
-                    let mstr = classInfo.module;
-                    if(mstr.charAt(mstr.length - 1) != '/') {
+        var str = this.codeFromAST(ast);
+        for (var i = 0, len = this.allTypes.length; i < len; i++) {
+            var type = this.allTypes[i];
+            if (!this.importedMap[type] && !this.isSimpleType(type)) {
+                var classInfo = this.analysor.classMap[type];
+                if (classInfo) {
+                    var mstr = classInfo.module;
+                    if (mstr.charAt(mstr.length - 1) != '/') {
                         mstr += '/';
                     }
                     str = 'import {' + type + '} from "' + mstr + type + '"\n' + str;
-                }                
+                }
             }
         }
         return str;
-    }
-
+    };
     // private processAST(ast: any) {
     //     switch (ast.type) {
     //         case AST_NODE_TYPES.ClassDeclaration:
@@ -190,397 +159,305 @@ export class TsMaker {
     //             break;
     //     }
     // }
-
     // private processClassDeclaration(ast: ClassDeclaration) {
     // }
-
-    private codeFromAST(ast: any): string {
-        let str = '';
+    TsMaker.prototype.codeFromAST = function (ast) {
+        var str = '';
         switch (ast.type) {
-
-            case AST_NODE_TYPES.ArrayExpression:
+            case typescript_estree_1.AST_NODE_TYPES.ArrayExpression:
                 str += this.codeFromArrayExpression(ast);
                 break;
-
-            case AST_NODE_TYPES.ArrayPattern:
+            case typescript_estree_1.AST_NODE_TYPES.ArrayPattern:
                 str += this.codeFromArrayPattern(ast);
                 break;
-
-            case AST_NODE_TYPES.ArrowFunctionExpression:
+            case typescript_estree_1.AST_NODE_TYPES.ArrowFunctionExpression:
                 str += this.codeFromArrowFunctionExpression(ast);
                 break;
-
-            case AST_NODE_TYPES.AssignmentExpression:
+            case typescript_estree_1.AST_NODE_TYPES.AssignmentExpression:
                 str += this.codeFromAssignmentExpression(ast);
                 break;
-
-            case AST_NODE_TYPES.AssignmentPattern:
+            case typescript_estree_1.AST_NODE_TYPES.AssignmentPattern:
                 str += this.codeFromAssignmentPattern(ast);
                 break;
-
-            case AST_NODE_TYPES.AwaitExpression:
+            case typescript_estree_1.AST_NODE_TYPES.AwaitExpression:
                 str += this.codeFromAwaitExpression(ast);
                 break;
-
             // case AST_NODE_TYPES.BigIntLiteral:
             //     str += this.codeFromBigIntLiteral(ast);
             //     break;
-
-            case AST_NODE_TYPES.BinaryExpression:
+            case typescript_estree_1.AST_NODE_TYPES.BinaryExpression:
                 str += this.codeFromBinaryExpression(ast);
                 break;
-
-            case AST_NODE_TYPES.BlockStatement:
+            case typescript_estree_1.AST_NODE_TYPES.BlockStatement:
                 str += this.codeFromBlockStatement(ast);
                 break;
-
-            case AST_NODE_TYPES.BreakStatement:
+            case typescript_estree_1.AST_NODE_TYPES.BreakStatement:
                 str += this.codeFromBreakStatement(ast);
                 break;
-
-            case AST_NODE_TYPES.CallExpression:
+            case typescript_estree_1.AST_NODE_TYPES.CallExpression:
                 str += this.codeFromCallExpression(ast);
                 break;
-
-            case AST_NODE_TYPES.CatchClause:
+            case typescript_estree_1.AST_NODE_TYPES.CatchClause:
                 str += this.codeFromCatchClause(ast);
                 break;
-
-            case AST_NODE_TYPES.ClassBody:
+            case typescript_estree_1.AST_NODE_TYPES.ClassBody:
                 str += this.codeFromClassBody(ast);
                 break;
-
-            case AST_NODE_TYPES.ClassDeclaration:
+            case typescript_estree_1.AST_NODE_TYPES.ClassDeclaration:
                 str += this.codeFromClassDeclaration(ast);
                 break;
-
-            case AST_NODE_TYPES.ClassExpression:
+            case typescript_estree_1.AST_NODE_TYPES.ClassExpression:
                 str += this.codeFromClassExpression(ast);
                 break;
-
-            case AST_NODE_TYPES.ClassProperty:
+            case typescript_estree_1.AST_NODE_TYPES.ClassProperty:
                 str += this.codeFromClassProperty(ast);
                 break;
-
-            case AST_NODE_TYPES.ConditionalExpression:
+            case typescript_estree_1.AST_NODE_TYPES.ConditionalExpression:
                 str += this.codeFromConditionalExpression(ast);
                 break;
-
-            case AST_NODE_TYPES.ContinueStatement:
+            case typescript_estree_1.AST_NODE_TYPES.ContinueStatement:
                 str += this.codeFromContinueStatement(ast);
                 break;
-
-            case AST_NODE_TYPES.DebuggerStatement:
+            case typescript_estree_1.AST_NODE_TYPES.DebuggerStatement:
                 str += this.codeFromDebuggerStatement(ast);
                 break;
-
-            case AST_NODE_TYPES.Decorator:
+            case typescript_estree_1.AST_NODE_TYPES.Decorator:
                 str += this.codeFromDecorator(ast);
                 break;
-
-            case AST_NODE_TYPES.DoWhileStatement:
+            case typescript_estree_1.AST_NODE_TYPES.DoWhileStatement:
                 str += this.codeFromDoWhileStatement(ast);
                 break;
-
-            case AST_NODE_TYPES.EmptyStatement:
+            case typescript_estree_1.AST_NODE_TYPES.EmptyStatement:
                 str += this.codeFromEmptyStatement(ast);
                 break;
-
-            case AST_NODE_TYPES.ExportAllDeclaration:
+            case typescript_estree_1.AST_NODE_TYPES.ExportAllDeclaration:
                 str += this.codeFromExportAllDeclaration(ast);
                 break;
-
-            case AST_NODE_TYPES.ExportDefaultDeclaration:
+            case typescript_estree_1.AST_NODE_TYPES.ExportDefaultDeclaration:
                 str += this.codeFromExportDefaultDeclaration(ast);
                 break;
-
-            case AST_NODE_TYPES.ExportNamedDeclaration:
+            case typescript_estree_1.AST_NODE_TYPES.ExportNamedDeclaration:
                 str += this.codeFromExportNamedDeclaration(ast);
                 break;
-
-            case AST_NODE_TYPES.ExportSpecifier:
+            case typescript_estree_1.AST_NODE_TYPES.ExportSpecifier:
                 str += this.codeFromExportSpecifier(ast);
                 break;
-
-            case AST_NODE_TYPES.ExpressionStatement:
+            case typescript_estree_1.AST_NODE_TYPES.ExpressionStatement:
                 str += this.codeFromExpressionStatement(ast);
                 break;
-
-            case AST_NODE_TYPES.ForInStatement:
+            case typescript_estree_1.AST_NODE_TYPES.ForInStatement:
                 str += this.codeFromForInStatement(ast);
                 break;
-
-            case AST_NODE_TYPES.ForOfStatement:
+            case typescript_estree_1.AST_NODE_TYPES.ForOfStatement:
                 str += this.codeFromForOfStatement(ast);
                 break;
-
-            case AST_NODE_TYPES.ForStatement:
+            case typescript_estree_1.AST_NODE_TYPES.ForStatement:
                 str += this.codeFromForStatement(ast);
                 break;
-
-            case AST_NODE_TYPES.FunctionDeclaration:
+            case typescript_estree_1.AST_NODE_TYPES.FunctionDeclaration:
                 str += this.codeFromFunctionDeclaration(ast);
                 break;
-
-            case AST_NODE_TYPES.FunctionExpression:
+            case typescript_estree_1.AST_NODE_TYPES.FunctionExpression:
                 str += this.codeFromFunctionExpression(ast);
                 break;
-
-            case AST_NODE_TYPES.Identifier:
+            case typescript_estree_1.AST_NODE_TYPES.Identifier:
                 str += this.codeFromIdentifier(ast);
                 break;
-
-            case AST_NODE_TYPES.IfStatement:
+            case typescript_estree_1.AST_NODE_TYPES.IfStatement:
                 str += this.codeFromIfStatement(ast);
                 break;
-
-            case AST_NODE_TYPES.ImportDeclaration:
+            case typescript_estree_1.AST_NODE_TYPES.ImportDeclaration:
                 str += this.codeFromImportDeclaration(ast);
                 break;
-
-            case AST_NODE_TYPES.ImportDefaultSpecifier:
+            case typescript_estree_1.AST_NODE_TYPES.ImportDefaultSpecifier:
                 str += this.codeFromImportDefaultSpecifier(ast);
                 break;
-
-            case AST_NODE_TYPES.ImportNamespaceSpecifier:
+            case typescript_estree_1.AST_NODE_TYPES.ImportNamespaceSpecifier:
                 str += this.codeFromImportNamespaceSpecifier(ast);
                 break;
-
-            case AST_NODE_TYPES.ImportSpecifier:
+            case typescript_estree_1.AST_NODE_TYPES.ImportSpecifier:
                 str += this.codeFromImportSpecifier(ast);
                 break;
-
-            case AST_NODE_TYPES.LabeledStatement:
+            case typescript_estree_1.AST_NODE_TYPES.LabeledStatement:
                 str += this.codeFromLabeledStatement(ast);
                 break;
-
-            case AST_NODE_TYPES.Literal:
+            case typescript_estree_1.AST_NODE_TYPES.Literal:
                 str += this.codeFromLiteral(ast);
                 break;
-
-            case AST_NODE_TYPES.LogicalExpression:
+            case typescript_estree_1.AST_NODE_TYPES.LogicalExpression:
                 str += this.codeFromLogicalExpression(ast);
                 break;
-
-            case AST_NODE_TYPES.MemberExpression:
+            case typescript_estree_1.AST_NODE_TYPES.MemberExpression:
                 str += this.codeFromMemberExpression(ast);
                 break;
-
-            case AST_NODE_TYPES.MetaProperty:
+            case typescript_estree_1.AST_NODE_TYPES.MetaProperty:
                 str += this.codeFromMetaProperty(ast);
                 break;
-
-            case AST_NODE_TYPES.MethodDefinition:
+            case typescript_estree_1.AST_NODE_TYPES.MethodDefinition:
                 str += this.codeFromMethodDefinition(ast);
                 break;
-
-            case AST_NODE_TYPES.NewExpression:
+            case typescript_estree_1.AST_NODE_TYPES.NewExpression:
                 str += this.codeFromNewExpression(ast);
                 break;
-
-            case AST_NODE_TYPES.ObjectExpression:
+            case typescript_estree_1.AST_NODE_TYPES.ObjectExpression:
                 str += this.codeFromObjectExpression(ast);
                 break;
-
-            case AST_NODE_TYPES.ObjectPattern:
+            case typescript_estree_1.AST_NODE_TYPES.ObjectPattern:
                 str += this.codeFromObjectPattern(ast);
                 break;
-
-            case AST_NODE_TYPES.Program:
+            case typescript_estree_1.AST_NODE_TYPES.Program:
                 str += this.codeFromProgram(ast);
                 break;
-
-            case AST_NODE_TYPES.Property:
+            case typescript_estree_1.AST_NODE_TYPES.Property:
                 str += this.codeFromProperty(ast);
                 break;
-
-            case AST_NODE_TYPES.RestElement:
+            case typescript_estree_1.AST_NODE_TYPES.RestElement:
                 str += this.codeFromRestElement(ast);
                 break;
-
-            case AST_NODE_TYPES.ReturnStatement:
+            case typescript_estree_1.AST_NODE_TYPES.ReturnStatement:
                 str += this.codeFromReturnStatement(ast);
                 break;
-
-            case AST_NODE_TYPES.SequenceExpression:
+            case typescript_estree_1.AST_NODE_TYPES.SequenceExpression:
                 str += this.codeFromSequenceExpression(ast);
                 break;
-
-            case AST_NODE_TYPES.SpreadElement:
+            case typescript_estree_1.AST_NODE_TYPES.SpreadElement:
                 str += this.codeFromSpreadElement(ast);
                 break;
-
-            case AST_NODE_TYPES.Super:
+            case typescript_estree_1.AST_NODE_TYPES.Super:
                 str += this.codeFromSuper(ast);
                 break;
-
-            case AST_NODE_TYPES.SwitchCase:
+            case typescript_estree_1.AST_NODE_TYPES.SwitchCase:
                 str += this.codeFromSwitchCase(ast);
                 break;
-
-            case AST_NODE_TYPES.SwitchStatement:
+            case typescript_estree_1.AST_NODE_TYPES.SwitchStatement:
                 str += this.codeFromSwitchStatement(ast);
                 break;
-
-            case AST_NODE_TYPES.TaggedTemplateExpression:
+            case typescript_estree_1.AST_NODE_TYPES.TaggedTemplateExpression:
                 str += this.codeFromTaggedTemplateExpression(ast);
                 break;
-
-            case AST_NODE_TYPES.TemplateElement:
+            case typescript_estree_1.AST_NODE_TYPES.TemplateElement:
                 str += this.codeFromTemplateElement(ast);
                 break;
-
-            case AST_NODE_TYPES.TemplateLiteral:
+            case typescript_estree_1.AST_NODE_TYPES.TemplateLiteral:
                 str += this.codeFromTemplateLiteral(ast);
                 break;
-
-            case AST_NODE_TYPES.ThisExpression:
+            case typescript_estree_1.AST_NODE_TYPES.ThisExpression:
                 str += this.codeFromThisExpression(ast);
                 break;
-
-            case AST_NODE_TYPES.ThrowStatement:
+            case typescript_estree_1.AST_NODE_TYPES.ThrowStatement:
                 str += this.codeFromThrowStatement(ast);
                 break;
-
-            case AST_NODE_TYPES.TryStatement:
+            case typescript_estree_1.AST_NODE_TYPES.TryStatement:
                 str += this.codeFromTryStatement(ast);
                 break;
-
-            case AST_NODE_TYPES.TSClassImplements:
+            case typescript_estree_1.AST_NODE_TYPES.TSClassImplements:
                 str += this.codeFromTSClassImplements(ast);
                 break;
-
-            case AST_NODE_TYPES.TSParenthesizedType:
+            case typescript_estree_1.AST_NODE_TYPES.TSParenthesizedType:
                 str += this.codeFromTSParenthesizedType(ast);
                 break;
-
-            case AST_NODE_TYPES.UnaryExpression:
+            case typescript_estree_1.AST_NODE_TYPES.UnaryExpression:
                 str += this.codeFromUnaryExpression(ast);
                 break;
-
-            case AST_NODE_TYPES.UpdateExpression:
+            case typescript_estree_1.AST_NODE_TYPES.UpdateExpression:
                 str += this.codeFromUpdateExpression(ast);
                 break;
-
-            case AST_NODE_TYPES.VariableDeclaration:
+            case typescript_estree_1.AST_NODE_TYPES.VariableDeclaration:
                 str += this.codeFromVariableDeclaration(ast);
                 break;
-
-            case AST_NODE_TYPES.VariableDeclarator:
+            case typescript_estree_1.AST_NODE_TYPES.VariableDeclarator:
                 str += this.codeFromVariableDeclarator(ast);
                 break;
-
-            case AST_NODE_TYPES.WhileStatement:
+            case typescript_estree_1.AST_NODE_TYPES.WhileStatement:
                 str += this.codeFromWhileStatement(ast);
                 break;
-
-            case AST_NODE_TYPES.WithStatement:
+            case typescript_estree_1.AST_NODE_TYPES.WithStatement:
                 str += this.codeFromWithStatement(ast);
                 break;
-
-            case AST_NODE_TYPES.YieldExpression:
+            case typescript_estree_1.AST_NODE_TYPES.YieldExpression:
                 str += this.codeFromYieldExpression(ast);
                 break;
-
-            case AST_NODE_TYPES.TSAbstractMethodDefinition:
+            case typescript_estree_1.AST_NODE_TYPES.TSAbstractMethodDefinition:
                 str += this.codeFromTSAbstractMethodDefinition(ast);
                 break;
-
-            case AST_NODE_TYPES.TSAsExpression:
+            case typescript_estree_1.AST_NODE_TYPES.TSAsExpression:
                 str += this.codeFromTSAsExpression(ast);
                 break;
-
-            case AST_NODE_TYPES.TSDeclareFunction:
+            case typescript_estree_1.AST_NODE_TYPES.TSDeclareFunction:
                 str += this.codeFromTSDeclareFunction(ast);
                 break;
-
-            case AST_NODE_TYPES.TSEnumDeclaration:
+            case typescript_estree_1.AST_NODE_TYPES.TSEnumDeclaration:
                 str += this.codeFromTSEnumDeclaration(ast);
                 break;
-
-            case AST_NODE_TYPES.TSInterfaceBody:
+            case typescript_estree_1.AST_NODE_TYPES.TSInterfaceBody:
                 str += this.codeFromTSInterfaceBody(ast);
                 break;
-
-            case AST_NODE_TYPES.TSMethodSignature:
+            case typescript_estree_1.AST_NODE_TYPES.TSMethodSignature:
                 str += this.codeFromTSMethodSignature(ast);
                 break;
-
-            case AST_NODE_TYPES.TSModuleBlock:
+            case typescript_estree_1.AST_NODE_TYPES.TSModuleBlock:
                 str += this.codeFromTSModuleBlock(ast);
                 break;
-
-            case AST_NODE_TYPES.TSModuleDeclaration:
+            case typescript_estree_1.AST_NODE_TYPES.TSModuleDeclaration:
                 str += this.codeFromTSModuleDeclaration(ast);
                 break;
-
-            case AST_NODE_TYPES.TSInterfaceDeclaration:
+            case typescript_estree_1.AST_NODE_TYPES.TSInterfaceDeclaration:
                 str += this.codeFromTSInterfaceDeclaration(ast);
                 break;
-
-            case AST_NODE_TYPES.TSTypeAssertion:
+            case typescript_estree_1.AST_NODE_TYPES.TSTypeAssertion:
                 str += this.codeFromTSTypeAssertion(ast);
                 break;
-
-            case AST_NODE_TYPES.TSTypeAnnotation:
+            case typescript_estree_1.AST_NODE_TYPES.TSTypeAnnotation:
                 str += this.codeFromTSTypeAnnotation(ast);
                 break;
-
-            case AST_NODE_TYPES.TSTypeParameterInstantiation:
+            case typescript_estree_1.AST_NODE_TYPES.TSTypeParameterInstantiation:
                 str += this.codeFromTSTypeParameterInstantiation(ast);
                 break;
-
-            case AST_NODE_TYPES.TSTypeReference:
+            case typescript_estree_1.AST_NODE_TYPES.TSTypeReference:
                 str += this.codeFromTSTypeReference(ast);
                 break;
-            
-            case AST_NODE_TYPES.TSVoidKeyword:
+            case typescript_estree_1.AST_NODE_TYPES.TSVoidKeyword:
                 str += this.codeFromTSVoidKeyword(ast);
                 break;
-
             case 'TSJSDocAllType':
                 str += 'any';
                 break;
-
             default:
                 console.log(util.inspect(ast, true, 3));
                 throw new Error('unrecornized type: ' + ast.type);
                 break;
         }
         return str;
-    }
-
-    private codeFromArrayExpression(ast: ArrayExpression): string {
-        let str = '';
-        for (let i = 0, len = ast.elements.length; i < len; i++) {
+    };
+    TsMaker.prototype.codeFromArrayExpression = function (ast) {
+        var str = '';
+        for (var i = 0, len = ast.elements.length; i < len; i++) {
             if (str) {
                 str += ', ';
             }
             str += this.codeFromAST(ast.elements[i]);
         }
         return '[' + str + ']';
-    }
-
-    private codeFromArrayPattern(ast: ArrayPattern): string {
+    };
+    TsMaker.prototype.codeFromArrayPattern = function (ast) {
         this.assert(false, ast, 'Not support ArrayPattern yet!');
         return '';
-    }
-
-    private codeFromArrowFunctionExpression(ast: ArrowFunctionExpression): string {
-        let str = '(';
+    };
+    TsMaker.prototype.codeFromArrowFunctionExpression = function (ast) {
+        var str = '(';
         if (ast.params) {
-            for (let i = 0, len = ast.params.length; i < len; i++) {
+            for (var i = 0, len = ast.params.length; i < len; i++) {
                 if (i > 0) {
                     str += ', ';
                 }
-                let oneParam = ast.params[i];
-                (oneParam as any).__parent = ast;
+                var oneParam = ast.params[i];
+                oneParam.__parent = ast;
                 str += this.codeFromAST(oneParam);
             }
         }
         str += ')\n';
         if (ast.body) {
-            let bodyStr = this.codeFromAST(ast.body);
+            var bodyStr = this.codeFromAST(ast.body);
             str += this.indent(bodyStr) + '\n';
         }
         this.assert(!ast.generator, ast, 'Not support generator yet!');
@@ -588,49 +465,42 @@ export class TsMaker {
         this.assert(!ast.expression, ast, 'Not support expression yet!');
         str += 'end\n';
         return str;
-    }
-
-    private codeFromAssignmentExpression(ast: AssignmentExpression): string {
-        return this.codeFromBinaryExpression(ast as any);
-    }
-
-    private codeFromAssignmentPattern(ast: AssignmentPattern): string {
-        let str = this.codeFromAST(ast.left);
+    };
+    TsMaker.prototype.codeFromAssignmentExpression = function (ast) {
+        return this.codeFromBinaryExpression(ast);
+    };
+    TsMaker.prototype.codeFromAssignmentPattern = function (ast) {
+        var str = this.codeFromAST(ast.left);
         str += ' = ' + this.codeFromAST(ast.right);
         return str;
-    }
-
-    private codeFromAwaitExpression(ast: AwaitExpression): string {
+    };
+    TsMaker.prototype.codeFromAwaitExpression = function (ast) {
         this.assert(false, ast, 'Not support AwaitExpression yet!');
         return '';
-    }
-
-    private codeFromBinaryExpression(ast: BinaryExpression): string {
-        let optStr = ast.operator;
+    };
+    TsMaker.prototype.codeFromBinaryExpression = function (ast) {
+        var optStr = ast.operator;
         this.assert('>>>=' != optStr, ast, 'Not support >>>= yet!');
-        (ast.left as any).__parent = ast;
-        (ast.right as any).__parent = ast;
-        let left = this.codeFromAST(ast.left);
+        ast.left.__parent = ast;
+        ast.right.__parent = ast;
+        var left = this.codeFromAST(ast.left);
         if (this.calPriority(ast.left) >= this.calPriority(ast)) {
             left = '(' + left + ')';
         }
-        let right = this.codeFromAST(ast.right);
+        var right = this.codeFromAST(ast.right);
         if (this.calPriority(ast.right) >= this.calPriority(ast)) {
             right = '(' + right + ')';
         }
-
         // if (optStr == 'in') {
         //     return right + '[' + left + ']';
         // }
-
         return left + ' ' + optStr + ' ' + right;
-    }
-
-    private codeFromBlockStatement(ast: BlockStatement): string {
-        let str = '';
-        for (let i = 0, len = ast.body.length; i < len; i++) {
-            let bodyEle = ast.body[i];
-            let bstr = this.codeFromAST(bodyEle);
+    };
+    TsMaker.prototype.codeFromBlockStatement = function (ast) {
+        var str = '';
+        for (var i = 0, len = ast.body.length; i < len; i++) {
+            var bodyEle = ast.body[i];
+            var bstr = this.codeFromAST(bodyEle);
             if (bstr) {
                 if (i > 0) {
                     str += '\n';
@@ -639,52 +509,49 @@ export class TsMaker {
             }
         }
         return str;
-    }
-
-    private codeFromBreakStatement(ast: BreakStatement): string {
+    };
+    TsMaker.prototype.codeFromBreakStatement = function (ast) {
         return 'break;';
-    }
-
-    private codeFromCallExpression(ast: CallExpression): string {
-        (ast.callee as any).__parent = ast;
-        let calleeStr = this.codeFromAST(ast.callee);
-        if(this.option.methordMapper && this.option.methordMapper[calleeStr]) {
+    };
+    TsMaker.prototype.codeFromCallExpression = function (ast) {
+        ast.callee.__parent = ast;
+        var calleeStr = this.codeFromAST(ast.callee);
+        if (this.option.methordMapper && this.option.methordMapper[calleeStr]) {
             calleeStr = this.option.methordMapper[calleeStr];
         }
-        if(this.calPriority(ast.callee) > this.calPriority(ast)) {
+        if (this.calPriority(ast.callee) > this.calPriority(ast)) {
             calleeStr = '(' + calleeStr + ')';
         }
-        let str = '';
-        let allAgmStr = '';
-        for (let i = 0, len = ast.arguments.length; i < len; i++) {
-            let arg = ast.arguments[i];
-            let argStr = this.codeFromAST(arg);
+        var str = '';
+        var allAgmStr = '';
+        for (var i = 0, len = ast.arguments.length; i < len; i++) {
+            var arg = ast.arguments[i];
+            var argStr = this.codeFromAST(arg);
             if (allAgmStr) {
                 allAgmStr += ', ';
             }
             allAgmStr += argStr;
         }
-        if(calleeStr == '__JS__') {
+        if (calleeStr == '__JS__') {
             str = allAgmStr.substr(1, allAgmStr.length - 2);
-        } else {
+        }
+        else {
             str = calleeStr + '(' + allAgmStr + ')';
         }
         return str;
-    }
-
-    private codeFromCatchClause(ast: CatchClause): string {
-        let str = 'catch(';
+    };
+    TsMaker.prototype.codeFromCatchClause = function (ast) {
+        var str = 'catch(';
         str += this.codeFromAST(ast.param);
-        str += ') {\n'
+        str += ') {\n';
         str += this.indent(this.codeFromBlockStatement(ast.body));
-        str += '\n}'
+        str += '\n}';
         return str;
-    }
-
-    private codeFromClassBody(ast: ClassBody): string {
-        let str = '';
-        for (let i = 0, len = ast.body.length; i < len; i++) {
-            let cbodyStr = this.codeFromAST(ast.body[i]);
+    };
+    TsMaker.prototype.codeFromClassBody = function (ast) {
+        var str = '';
+        for (var i = 0, len = ast.body.length; i < len; i++) {
+            var cbodyStr = this.codeFromAST(ast.body[i]);
             if (cbodyStr) {
                 if (i > 0) {
                     str += '\n';
@@ -693,9 +560,8 @@ export class TsMaker {
             }
         }
         return str;
-    }
-
-    private codeFromClassDeclaration(ast: ClassDeclaration): string {
+    };
+    TsMaker.prototype.codeFromClassDeclaration = function (ast) {
         if (ast.typeParameters) {
             // typeParameters?: TSTypeParameterDeclaration;
         }
@@ -705,28 +571,26 @@ export class TsMaker {
         if (!ast.id) {
             this.assert(false, ast, 'Class name is necessary!');
         }
-        let className = this.codeFromAST(ast.id);
+        var className = this.codeFromAST(ast.id);
         this.importedMap[className] = true;
         this.crtClass = this.analysor.classMap[className];
         this.assert(null != this.crtClass, ast, '[ERROR]Cannot find class info: ' + className);
-
-        let str = '';
-        if((ast as any).__exported) {
+        var str = '';
+        if (ast.__exported) {
             str += 'export ';
         }
         str += 'class ' + className + ' ';
-
         if (ast.superClass) {
-            (ast.superClass as any).__isType = true;
+            ast.superClass.__isType = true;
             str += 'extends ' + this.codeFromAST(ast.superClass) + ' ';
         }
-        if(ast.implements) {
+        if (ast.implements) {
             str += 'implements ';
-            for(let i = 0, len = ast.implements.length; i < len; i++) {
-                if(i > 0) {
+            for (var i = 0, len = ast.implements.length; i < len; i++) {
+                if (i > 0) {
                     str += ', ';
                 }
-                (ast.implements[i] as any).__isType = true;
+                ast.implements[i].__isType = true;
                 str += this.codeFromAST(ast.implements[i]);
             }
             str += ' ';
@@ -747,399 +611,376 @@ export class TsMaker {
         str += '\n}';
         this.crtClass = null;
         return str;
-    }
-
-    private codeFromClassExpression(ast: ClassExpression): string {
+    };
+    TsMaker.prototype.codeFromClassExpression = function (ast) {
         // this.pintHit(ast);
-        return this.codeFromClassDeclaration(ast as any);
-    }
-
-    private codeFromClassProperty(ast: ClassProperty): string {
+        return this.codeFromClassDeclaration(ast);
+    };
+    TsMaker.prototype.codeFromClassProperty = function (ast) {
         this.assert(!ast.decorators, ast, 'not support decorators yet!');
         this.assert(!ast.optional, ast, 'not support optional yet!');
         this.assert(!ast.computed, ast, 'not support computed yet!');
         this.assert(!ast.definite, ast, 'not support definite yet!');
         this.assert(!ast.declare, ast, 'not support declare yet!');
-        let str = '';
-        if(ast.accessibility) {
+        var str = '';
+        if (ast.accessibility) {
             str += ast.accessibility + ' ';
         }
-        if(ast.static) {
+        if (ast.static) {
             str += 'static ';
         }
-        if(ast.readonly) {
+        if (ast.readonly) {
             str += 'readonly ';
         }
-        let propertyName = this.codeFromAST(ast.key);
+        var propertyName = this.codeFromAST(ast.key);
         str += propertyName;
-        if(ast.typeAnnotation) {
+        if (ast.typeAnnotation) {
             str += ': ' + this.codeFromAST(ast.typeAnnotation);
         }
         if (ast.value) {
             str += ' = ' + this.codeFromAST(ast.value);
         }
         str += ';';
-
         return str;
-    }
-
-    private codeFromConditionalExpression(ast: ConditionalExpression): string {
-        let testStr = this.codeFromAST(ast.test);
-        if(this.calPriority(ast.test) >= this.calPriority(ast)) {
+    };
+    TsMaker.prototype.codeFromConditionalExpression = function (ast) {
+        var testStr = this.codeFromAST(ast.test);
+        if (this.calPriority(ast.test) >= this.calPriority(ast)) {
             testStr = '(' + testStr + ')';
         }
-        let consequantStr = this.codeFromAST(ast.consequent);
-        if(this.calPriority(ast.consequent) >= this.calPriority(ast)) {
+        var consequantStr = this.codeFromAST(ast.consequent);
+        if (this.calPriority(ast.consequent) >= this.calPriority(ast)) {
             consequantStr = '(' + consequantStr + ')';
         }
-        let alternateStr = this.codeFromAST(ast.alternate);
-        if(this.calPriority(ast.alternate) >= this.calPriority(ast)) {
+        var alternateStr = this.codeFromAST(ast.alternate);
+        if (this.calPriority(ast.alternate) >= this.calPriority(ast)) {
             alternateStr = '(' + alternateStr + ')';
         }
-        let str = testStr + ' ? ' + consequantStr + ' : ' + alternateStr;
+        var str = testStr + ' ? ' + consequantStr + ' : ' + alternateStr;
         return str;
-    }
-
-    private codeFromContinueStatement(ast: ContinueStatement): string {
+    };
+    TsMaker.prototype.codeFromContinueStatement = function (ast) {
         return 'continue;';
-    }
-
-    private codeFromDebuggerStatement(ast: DebuggerStatement): string {
+    };
+    TsMaker.prototype.codeFromDebuggerStatement = function (ast) {
         this.assert(false, ast, 'Not support DebuggerStatement yet!');
         return '';
-    }
-
-    private codeFromDecorator(ast: Decorator): string {
+    };
+    TsMaker.prototype.codeFromDecorator = function (ast) {
         this.assert(false, ast, 'Not support Decorator yet!');
         return '';
-    }
-
-    private codeFromDoWhileStatement(ast: DoWhileStatement): string {
+    };
+    TsMaker.prototype.codeFromDoWhileStatement = function (ast) {
         this.assert(false, ast, 'Not support DoWhileStatement yet!');
         return '';
-    }
-
-    private codeFromEmptyStatement(ast: EmptyStatement): string {
+    };
+    TsMaker.prototype.codeFromEmptyStatement = function (ast) {
         return '';
-    }
-
-    private codeFromExportAllDeclaration(ast: ExportAllDeclaration): string {
+    };
+    TsMaker.prototype.codeFromExportAllDeclaration = function (ast) {
         this.assert(false, ast, 'Not support ExportAllDeclaration yet!');
         return '';
-    }
-
-    private codeFromExportDefaultDeclaration(ast: ExportDefaultDeclaration): string {
+    };
+    TsMaker.prototype.codeFromExportDefaultDeclaration = function (ast) {
         return '';
-    }
-
-    private codeFromExportNamedDeclaration(ast: ExportNamedDeclaration): string {
-        (ast.declaration as any).__exported = true;
-        if ((ast as any).__module) {
-            (ast.declaration as any).__module = (ast as any).__module;
+    };
+    TsMaker.prototype.codeFromExportNamedDeclaration = function (ast) {
+        ast.declaration.__exported = true;
+        if (ast.__module) {
+            ast.declaration.__module = ast.__module;
         }
         return this.codeFromAST(ast.declaration);
-    }
-
-    private codeFromExportSpecifier(ast: ExportSpecifier): string {
+    };
+    TsMaker.prototype.codeFromExportSpecifier = function (ast) {
         this.assert(false, ast, 'Not support ExportSpecifier yet!');
         return '';
-    }
-
-    private codeFromExpressionStatement(ast: ExpressionStatement): string {
+    };
+    TsMaker.prototype.codeFromExpressionStatement = function (ast) {
         return this.codeFromAST(ast.expression);
-    }
-
-    private codeFromForInStatement(ast: ForInStatement): string {
-        (ast.left as any).__parent = ast;
-        let str = 'for(' + this.codeFromAST(ast.left) + ' in ' + this.codeFromAST(ast.right) + ') {\n';
+    };
+    TsMaker.prototype.codeFromForInStatement = function (ast) {
+        ast.left.__parent = ast;
+        var str = 'for(' + this.codeFromAST(ast.left) + ' in ' + this.codeFromAST(ast.right) + ') {\n';
         str += this.indent(this.codeFromAST(ast.body)) + '\n';
         str += '}';
         return str;
-    }
-
-    private codeFromForOfStatement(ast: ForOfStatement): string {
-        (ast.left as any).__parent = ast;
-        let str = 'for(' + this.codeFromAST(ast.left) + ' of ' + this.codeFromAST(ast.right) + ') {\n';
+    };
+    TsMaker.prototype.codeFromForOfStatement = function (ast) {
+        ast.left.__parent = ast;
+        var str = 'for(' + this.codeFromAST(ast.left) + ' of ' + this.codeFromAST(ast.right) + ') {\n';
         str += this.indent(this.codeFromAST(ast.body)) + '\n';
         str += '}';
         return str;
-    }
-
-    private codeFromForStatement(ast: ForStatement): string {
-        let str = 'for(';
+    };
+    TsMaker.prototype.codeFromForStatement = function (ast) {
+        var str = 'for(';
         if (ast.init) {
             str += this.codeFromAST(ast.init);
-        } 
-        if(str.charAt(str.length - 1) != ';') {
+        }
+        if (str.charAt(str.length - 1) != ';') {
             str += '; ';
         }
         if (ast.test) {
             str += this.codeFromAST(ast.test);
-        } 
+        }
         str += '; ';
         if (ast.update) {
             str += this.codeFromAST(ast.update);
-        } 
+        }
         str += ') {\n';
-        let repeatBodyStr = this.codeFromAST(ast.body);
+        var repeatBodyStr = this.codeFromAST(ast.body);
         str += this.indent(repeatBodyStr) + '\n';
         str += '}';
         return str;
-    }
-
-    private codeFromFunctionDeclaration(ast: FunctionDeclaration): string {
-        return this.codeFromFunctionExpression(ast as any);
-    }
-
-    private codeFromFunctionExpression(ast: FunctionExpression): string {
+    };
+    TsMaker.prototype.codeFromFunctionDeclaration = function (ast) {
+        return this.codeFromFunctionExpression(ast);
+    };
+    TsMaker.prototype.codeFromFunctionExpression = function (ast) {
         return this.codeFromFunctionExpressionInternal(null, false, null, null, ast);
-    }
-
-    private codeFromFunctionExpressionInternal(funcName: string, isStatic: boolean, kind: string, accessibility: Accessibility, ast: FunctionExpression): string {
-        let str = '';
+    };
+    TsMaker.prototype.codeFromFunctionExpressionInternal = function (funcName, isStatic, kind, accessibility, ast) {
+        var str = '';
         if (!funcName && ast.id) {
             funcName = this.codeFromAST(ast.id);
         }
-        if(!funcName) {
+        if (!funcName) {
             funcName = 'function';
         }
-        if(accessibility) {
+        if (accessibility) {
             str += accessibility + ' ';
         }
-        if(isStatic) {
+        if (isStatic) {
             str += 'static ';
         }
         if (kind == 'get' || kind == 'set') {
             str += kind + ' ';
-        } 
-
-        if(this.crtClass) {
-            if(funcName == this.crtClass.name) funcName = 'constructor';
+        }
+        if (this.crtClass) {
+            if (funcName == this.crtClass.name)
+                funcName = 'constructor';
             this.crtFunc = this.crtClass.functionMap[funcName];
         }
         str += funcName + '(';
         if (ast.params) {
-            for (let i = 0, len = ast.params.length; i < len; i++) {
+            for (var i = 0, len = ast.params.length; i < len; i++) {
                 if (i > 0) {
                     str += ', ';
                 }
-                let oneParam = ast.params[i];
-                (oneParam as any).__parent = ast;
-                (oneParam as any).__isFuncParam = true;
+                var oneParam = ast.params[i];
+                oneParam.__parent = ast;
+                oneParam.__isFuncParam = true;
                 str += this.codeFromAST(oneParam);
             }
         }
         str += ')';
-        if(ast.returnType && kind != 'set' && funcName != 'constructor') {
+        if (ast.returnType && kind != 'set' && funcName != 'constructor') {
             str += ': ' + this.codeFromAST(ast.returnType);
         }
         str += ' {\n';
-
         if (ast.body) {
             // 构造函数加上super
             this.startAddThis = true;
-            let bodyStr = this.codeFromAST(ast.body);
-            if('constructor' == funcName && this.crtClass.superClass && bodyStr.indexOf('super(') < 0) {
-                if(bodyStr) {
+            var bodyStr = this.codeFromAST(ast.body);
+            if ('constructor' == funcName && this.crtClass.superClass && bodyStr.indexOf('super(') < 0) {
+                if (bodyStr) {
                     bodyStr = 'super();\n' + bodyStr;
-                } else {
+                }
+                else {
                     bodyStr = 'super();';
                 }
             }
             this.startAddThis = false;
             str += this.indent(bodyStr);
         }
-        str += '\n}'
+        str += '\n}';
         this.assert(!ast.generator, ast, 'Not support generator yet!');
         this.assert(!ast.async, ast, 'Not support async yet!');
         this.assert(!ast.expression, ast, 'Not support expression yet!');
         this.assert(!ast.declare, ast, 'Not support declare yet!');
         this.crtFunc = null;
         return str;
-    }
-
-    private codeFromIdentifier(ast: Identifier): string {
-        let str = ast.name;
-        if(this.option.idReplacement && typeof(this.option.idReplacement[str]) === 'string') {
+    };
+    TsMaker.prototype.codeFromIdentifier = function (ast) {
+        var str = ast.name;
+        if (this.option.idReplacement && typeof (this.option.idReplacement[str]) === 'string') {
             str = this.option.idReplacement[str];
         }
-        if(this.startAddThis && null != this.crtClass && null != this.crtFunc && 
-            (!(ast as any).__parent || this.parentNoThis.indexOf((ast as any).__parent.type) < 0 && ((ast as any).__parent.type != AST_NODE_TYPES.MemberExpression || ((ast as any).__parent as MemberExpression).computed))) {
-            if(this.crtFunc.params.indexOf(str) < 0) {
-                let minfo = this.getMemberInfo(this.crtClass, str);
-                if(minfo) {
-                    if(minfo.static) {
+        if (this.startAddThis && null != this.crtClass && null != this.crtFunc &&
+            (!ast.__parent || this.parentNoThis.indexOf(ast.__parent.type) < 0 && (ast.__parent.type != typescript_estree_1.AST_NODE_TYPES.MemberExpression || ast.__parent.computed))) {
+            if (this.crtFunc.params.indexOf(str) < 0) {
+                var minfo = this.getMemberInfo(this.crtClass, str);
+                if (minfo) {
+                    if (minfo.static) {
                         str = minfo.className + '.' + str;
-                    } else {
+                    }
+                    else {
                         str = 'this.' + str;
                     }
-                } else if(this.analysor.classMap[str]) {
-                    let mapped = this.option.typeMapper[str];
-                    if(mapped) str = mapped;
-                    if(this.allTypes.indexOf(str) < 0) {
+                }
+                else if (this.analysor.classMap[str]) {
+                    var mapped = this.option.typeMapper[str];
+                    if (mapped)
+                        str = mapped;
+                    if (this.allTypes.indexOf(str) < 0) {
                         this.allTypes.push(str);
                     }
                 }
             }
         }
-        if(ast.typeAnnotation) {
+        if (ast.typeAnnotation) {
             str += ': ' + this.codeFromAST(ast.typeAnnotation);
-        } else if((ast as any).__isType) {
-            let mapped = this.option.typeMapper[str];
-            if(mapped) str = mapped;
-            if(this.allTypes.indexOf(str) < 0) {
+        }
+        else if (ast.__isType) {
+            var mapped = this.option.typeMapper[str];
+            if (mapped)
+                str = mapped;
+            if (this.allTypes.indexOf(str) < 0) {
                 this.allTypes.push(str);
             }
         }
         return str;
-    }
-
-    private codeFromIfStatement(ast: IfStatement): string {
-        let testStr = this.codeFromAST(ast.test);
-        let str = 'if(' + testStr + ' ) {\n';
+    };
+    TsMaker.prototype.codeFromIfStatement = function (ast) {
+        var testStr = this.codeFromAST(ast.test);
+        var str = 'if(' + testStr + ' ) {\n';
         str += this.indent(this.codeFromAST(ast.consequent));
         str += '\n} ';
-        if (ast.alternate && (ast.alternate.type != AST_NODE_TYPES.BlockStatement || (ast.alternate as BlockStatement).body.length > 0)) {
+        if (ast.alternate && (ast.alternate.type != typescript_estree_1.AST_NODE_TYPES.BlockStatement || ast.alternate.body.length > 0)) {
             str += 'else ';
-            let altStr = this.codeFromAST(ast.alternate);
-            if (ast.alternate.type != AST_NODE_TYPES.IfStatement) {
+            var altStr = this.codeFromAST(ast.alternate);
+            if (ast.alternate.type != typescript_estree_1.AST_NODE_TYPES.IfStatement) {
                 str += '{\n';
                 str += this.indent(altStr);
                 str += '\n}';
-            } else {
+            }
+            else {
                 str += altStr;
             }
-        } 
+        }
         return str;
-    }
-
-    private codeFromImportDeclaration(ast: ImportDeclaration): string {
-        let str = 'import ';
-        let specifierStr = '';
-        let cnt = 0;
-        for(let i = 0, len = ast.specifiers.length; i < len; i++) {
-            let ss = this.codeFromAST(ast.specifiers[i]);
-            if(this.importedMap[ss]) continue;
-            if(cnt > 0) {
+    };
+    TsMaker.prototype.codeFromImportDeclaration = function (ast) {
+        var str = 'import ';
+        var specifierStr = '';
+        var cnt = 0;
+        for (var i = 0, len = ast.specifiers.length; i < len; i++) {
+            var ss = this.codeFromAST(ast.specifiers[i]);
+            if (this.importedMap[ss])
+                continue;
+            if (cnt > 0) {
                 specifierStr += ', ';
             }
             specifierStr += ss;
             this.importedMap[ss] = true;
             cnt++;
         }
-        if(cnt == 0) return '';
-        let sourceStr: string;
-        if(this.option.importRule && this.option.importRule.fromModule) {
-            for(let fm of this.option.importRule.fromModule) {
-                let sourceValue = ast.source.value as string;
-                if(new RegExp(fm.regular).test(sourceValue)) {
+        if (cnt == 0)
+            return '';
+        var sourceStr;
+        if (this.option.importRule && this.option.importRule.fromModule) {
+            for (var _i = 0, _a = this.option.importRule.fromModule; _i < _a.length; _i++) {
+                var fm = _a[_i];
+                var sourceValue = ast.source.value;
+                if (new RegExp(fm.regular).test(sourceValue)) {
                     sourceStr = ' = ' + fm.module + '.' + sourceValue.substr(sourceValue.lastIndexOf('/') + 1);
                     break;
                 }
             }
         }
-        if(!sourceStr) {
+        if (!sourceStr) {
             specifierStr = '{' + specifierStr + '}';
             sourceStr = ' from ' + this.codeFromAST(ast.source);
         }
         str += specifierStr + sourceStr;
         return str;
-    }
-
-    private codeFromImportDefaultSpecifier(ast: ImportDefaultSpecifier): string {
+    };
+    TsMaker.prototype.codeFromImportDefaultSpecifier = function (ast) {
         this.assert(false, ast, 'Not support ImportDefaultSpecifier yet!');
         return '';
-    }
-
-    private codeFromImportNamespaceSpecifier(ast: ImportNamespaceSpecifier): string {
+    };
+    TsMaker.prototype.codeFromImportNamespaceSpecifier = function (ast) {
         this.assert(false, ast, 'Not support ImportNamespaceSpecifier yet!');
         return '';
-    }
-
-    private codeFromImportSpecifier(ast: ImportSpecifier): string {
-        let str = this.codeFromAST(ast.imported);
+    };
+    TsMaker.prototype.codeFromImportSpecifier = function (ast) {
+        var str = this.codeFromAST(ast.imported);
         return str;
-    }
-
-    private codeFromLabeledStatement(ast: LabeledStatement): string {
+    };
+    TsMaker.prototype.codeFromLabeledStatement = function (ast) {
         this.assert(false, ast, 'Not support LabeledStatement yet!');
         return '';
-    }
-
-    private codeFromLiteral(ast: Literal): string {
+    };
+    TsMaker.prototype.codeFromLiteral = function (ast) {
         // if (ast.regex) {
         //     return ast.raw;
         // }
-        let str = ast.raw;
-        if(this.option.literalReplacement && this.option.literalReplacement[str]) {
+        var str = ast.raw;
+        if (this.option.literalReplacement && this.option.literalReplacement[str]) {
             str = this.option.literalReplacement[str];
         }
         return str;
-    }
-
-    private codeFromLogicalExpression(ast: LogicalExpression): string {
-        let left = this.codeFromAST(ast.left);
+    };
+    TsMaker.prototype.codeFromLogicalExpression = function (ast) {
+        var left = this.codeFromAST(ast.left);
         if (this.calPriority(ast.left) >= this.calPriority(ast)) {
             left = '(' + left + ')';
         }
-        let right = this.codeFromAST(ast.right);
+        var right = this.codeFromAST(ast.right);
         if (this.calPriority(ast.right) >= this.calPriority(ast)) {
             right = '(' + right + ')';
         }
-        let optStr = ast.operator;
-        let str = left + ' ' + optStr + ' ' + right;
+        var optStr = ast.operator;
+        var str = left + ' ' + optStr + ' ' + right;
         return str;
-    }
-
-    private codeFromMemberExpression(ast: MemberExpression): string {
-        (ast.property as any).__parent = ast;
+    };
+    TsMaker.prototype.codeFromMemberExpression = function (ast) {
+        ast.property.__parent = ast;
         // if(ast.object.type == AST_NODE_TYPES.Identifier) {
         //     (ast.object as any).__addThis = true;
         // }
-        let objStr = this.codeFromAST(ast.object);
-        if (AST_NODE_TYPES.TSAsExpression == (ast.object as any).type || this.calPriority(ast.object) > this.calPriority(ast)) {
+        var objStr = this.codeFromAST(ast.object);
+        if (typescript_estree_1.AST_NODE_TYPES.TSAsExpression == ast.object.type || this.calPriority(ast.object) > this.calPriority(ast)) {
             objStr = '(' + objStr + ')';
         }
-        let str = objStr;
-        (ast.property as any).__parent = ast;
-        let propertyStr = this.codeFromAST(ast.property);
+        var str = objStr;
+        ast.property.__parent = ast;
+        var propertyStr = this.codeFromAST(ast.property);
         if (ast.computed) {
             str += '[' + propertyStr + ']';
-        } else {
+        }
+        else {
             str += '.' + propertyStr;
         }
         return str;
-    }
-
-    private codeFromMetaProperty(ast: MetaProperty): string {
+    };
+    TsMaker.prototype.codeFromMetaProperty = function (ast) {
         this.assert(false, ast, 'Not support MetaProperty yet!');
         return '';
-    }
-
-    private codeFromMethodDefinition(ast: MethodDefinition): string {
-        let funcName = null;
+    };
+    TsMaker.prototype.codeFromMethodDefinition = function (ast) {
+        var funcName = null;
         if (ast.key) {
             funcName = this.codeFromAST(ast.key);
         }
         if (ast.value.type == "TSEmptyBodyFunctionExpression") {
             this.assert(false, ast, 'Not support TSEmptyBodyFunctionExpression yet!');
         }
-        return this.codeFromFunctionExpressionInternal(funcName, ast.static, ast.kind, ast.accessibility, ast.value as FunctionExpression);
-    }
-
-    private codeFromNewExpression(ast: NewExpression): string {
-        let callee = this.codeFromAST(ast.callee);
+        return this.codeFromFunctionExpressionInternal(funcName, ast.static, ast.kind, ast.accessibility, ast.value);
+    };
+    TsMaker.prototype.codeFromNewExpression = function (ast) {
+        var callee = this.codeFromAST(ast.callee);
         // if ('Date' == callee) {
         //     this.addImport('date');
         // }
         if (this.calPriority(ast.callee) > this.calPriority(ast)) {
             callee = '(' + callee + ')';
         }
-        if ('Array' == callee/* && ast.arguments.length == 0*/) {
+        if ('Array' == callee /* && ast.arguments.length == 0*/) {
             return '[]';
         }
-        let argStr = '';
-        for (let i = 0, len = ast.arguments.length; i < len; i++) {
+        var argStr = '';
+        for (var i = 0, len = ast.arguments.length; i < len; i++) {
             if (i > 0) {
                 argStr += ', ';
             }
@@ -1148,31 +989,28 @@ export class TsMaker {
         // if ('RegExp' == callee) {
         //     return argStr;
         // }
-        let str = 'new ' + callee + '(' + argStr + ')';
+        var str = 'new ' + callee + '(' + argStr + ')';
         return str;
-    }
-
-    private codeFromObjectExpression(ast: ObjectExpression): string {
+    };
+    TsMaker.prototype.codeFromObjectExpression = function (ast) {
         var str = '{';
-        for (let i = 0, len = ast.properties.length; i < len; i++) {
+        for (var i = 0, len = ast.properties.length; i < len; i++) {
             if (i > 0) {
                 str += ', ';
             }
             str += this.codeFromAST(ast.properties[i]);
         }
         return str + '}';
-    }
-
-    private codeFromObjectPattern(ast: ObjectPattern): string {
+    };
+    TsMaker.prototype.codeFromObjectPattern = function (ast) {
         this.assert(false, ast, 'Not support ObjectPattern yet!');
         return '';
-    }
-
-    private codeFromProgram(ast: Program): string {
-        let str = '';
-        for (let i = 0, len = ast.body.length; i < len; i++) {
-            let stm = ast.body[i];
-            let bodyStr = this.codeFromAST(stm);
+    };
+    TsMaker.prototype.codeFromProgram = function (ast) {
+        var str = '';
+        for (var i = 0, len = ast.body.length; i < len; i++) {
+            var stm = ast.body[i];
+            var bodyStr = this.codeFromAST(stm);
             if (bodyStr) {
                 if (i > 0) {
                     str += '\n';
@@ -1181,27 +1019,23 @@ export class TsMaker {
             }
         }
         return str;
-    }
-
-    private codeFromProperty(ast: Property): string {
-        (ast.key as any).__parent = ast;
+    };
+    TsMaker.prototype.codeFromProperty = function (ast) {
+        ast.key.__parent = ast;
         return this.codeFromAST(ast.key) + ': ' + this.codeFromAST(ast.value);
-    }
-
-    private codeFromRestElement(ast: RestElement): string {
+    };
+    TsMaker.prototype.codeFromRestElement = function (ast) {
         return '...' + this.codeFromAST(ast.argument);
-    }
-
-    private codeFromReturnStatement(ast: ReturnStatement): string {
-        let str = 'return';
-        if(ast.argument) {
+    };
+    TsMaker.prototype.codeFromReturnStatement = function (ast) {
+        var str = 'return';
+        if (ast.argument) {
             str += ' ' + this.codeFromAST(ast.argument);
         }
         return str;
-    }
-
-    private codeFromSequenceExpression(ast: SequenceExpression): string {
-        let str = '';
+    };
+    TsMaker.prototype.codeFromSequenceExpression = function (ast) {
+        var str = '';
         for (var i = 0, len = ast.expressions.length; i < len; i++) {
             if (i > 0) {
                 str += ', ';
@@ -1209,26 +1043,24 @@ export class TsMaker {
             str += this.codeFromAST(ast.expressions[i]);
         }
         return str;
-    }
-
-    private codeFromSpreadElement(ast: SpreadElement): string {
+    };
+    TsMaker.prototype.codeFromSpreadElement = function (ast) {
         return '...';
-    }
-
-    private codeFromSuper(ast: Super): string {
+    };
+    TsMaker.prototype.codeFromSuper = function (ast) {
         return 'super';
-    }
-
-    private codeFromSwitchCase(ast: SwitchCase): string {
-        let str = '';
+    };
+    TsMaker.prototype.codeFromSwitchCase = function (ast) {
+        var str = '';
         if (ast.test) {
             str += 'case ' + this.codeFromAST(ast.test) + ':\n';
-        } else {
+        }
+        else {
             str += 'default:\n';
         }
-        let csqStr = '';
-        for (let i = 0, len = ast.consequent.length; i < len; i++) {
-            if (ast.consequent[i].type != AST_NODE_TYPES.BreakStatement) {
+        var csqStr = '';
+        for (var i = 0, len = ast.consequent.length; i < len; i++) {
+            if (ast.consequent[i].type != typescript_estree_1.AST_NODE_TYPES.BreakStatement) {
                 if (i > 0) {
                     csqStr += '\n';
                 }
@@ -1237,15 +1069,14 @@ export class TsMaker {
         }
         if (csqStr) {
             str += '{\n' + this.indent(csqStr) + '\n}\n';
-        } 
-        str += 'break;'
+        }
+        str += 'break;';
         return str;
-    }
-
-    private codeFromSwitchStatement(ast: SwitchStatement): string {
-        let str = 'switch(' + this.codeFromAST(ast.discriminant) + ') {\n';
-        let caseStr = '';
-        for (let i = 0, len = ast.cases.length; i < len; i++) {
+    };
+    TsMaker.prototype.codeFromSwitchStatement = function (ast) {
+        var str = 'switch(' + this.codeFromAST(ast.discriminant) + ') {\n';
+        var caseStr = '';
+        for (var i = 0, len = ast.cases.length; i < len; i++) {
             if (i > 0) {
                 caseStr += '\n';
             }
@@ -1254,33 +1085,27 @@ export class TsMaker {
         str += this.indent(caseStr);
         str += '\n}';
         return str;
-    }
-
-    private codeFromTaggedTemplateExpression(ast: TaggedTemplateExpression): string {
+    };
+    TsMaker.prototype.codeFromTaggedTemplateExpression = function (ast) {
         this.assert(false, ast, 'Not support TaggedTemplateExpression yet!');
         return '';
-    }
-
-    private codeFromTemplateElement(ast: TemplateElement): string {
+    };
+    TsMaker.prototype.codeFromTemplateElement = function (ast) {
         this.assert(false, ast, 'Not support TemplateElement yet!');
         return '';
-    }
-
-    private codeFromTemplateLiteral(ast: TemplateLiteral): string {
+    };
+    TsMaker.prototype.codeFromTemplateLiteral = function (ast) {
         this.assert(false, ast, 'Not support TemplateLiteral yet!');
         return '';
-    }
-
-    private codeFromThisExpression(ast: ThisExpression): string {
+    };
+    TsMaker.prototype.codeFromThisExpression = function (ast) {
         return 'this';
-    }
-
-    private codeFromThrowStatement(ast: ThrowStatement): string {
+    };
+    TsMaker.prototype.codeFromThrowStatement = function (ast) {
         return 'throw ' + this.codeFromAST(ast.argument);
-    }
-
-    private codeFromTryStatement(ast: TryStatement): string {
-        let str = 'try{\n';
+    };
+    TsMaker.prototype.codeFromTryStatement = function (ast) {
+        var str = 'try{\n';
         str += this.indent(this.codeFromAST(ast.block));
         str += '\n} ';
         if (ast.handler) {
@@ -1289,109 +1114,98 @@ export class TsMaker {
         if (ast.finalizer) {
             str += ' finally {\n';
             str += this.indent(this.codeFromAST(ast.finalizer));
-            str += '\n}'
+            str += '\n}';
         }
         str += '\n';
         return str;
-    }
-
-    private codeFromTSClassImplements(ast: TSClassImplements): string {
-        let str = '';
+    };
+    TsMaker.prototype.codeFromTSClassImplements = function (ast) {
+        var str = '';
         str += this.codeFromAST(ast.expression);
-        if(ast.typeParameters) {
+        if (ast.typeParameters) {
             str += '<' + this.codeFromAST(ast.typeParameters) + '>';
         }
         return str;
-    }
-
-    private codeFromTSParenthesizedType(ast: TSParenthesizedType): string {
+    };
+    TsMaker.prototype.codeFromTSParenthesizedType = function (ast) {
         return '(' + this.codeFromAST(ast.typeAnnotation) + ')';
-    }
-
-    private codeFromUnaryExpression(ast: UnaryExpression): string {
-        let str;
-        let agm = this.codeFromAST(ast.argument);
+    };
+    TsMaker.prototype.codeFromUnaryExpression = function (ast) {
+        var str;
+        var agm = this.codeFromAST(ast.argument);
         if (this.calPriority(ast.argument) >= this.calPriority(ast)) {
             agm = '(' + agm + ')';
         }
         if (ast.prefix) {
             str = ast.operator + agm;
-        } else {
+        }
+        else {
             str = agm + ast.operator;
         }
         return str;
-    }
-
-    private codeFromUpdateExpression(ast: UpdateExpression): string {
-        let str = this.codeFromAST(ast.argument);
+    };
+    TsMaker.prototype.codeFromUpdateExpression = function (ast) {
+        var str = this.codeFromAST(ast.argument);
         if (this.calPriority(ast.argument) >= this.calPriority(ast)) {
             str = '(' + str + ')';
         }
         if (ast.prefix) {
-          str = ast.operator + str;
-        } else {
-          str = str + ast.operator;
+            str = ast.operator + str;
+        }
+        else {
+            str = str + ast.operator;
         }
         return str;
-    }
-
-    private codeFromVariableDeclaration(ast: VariableDeclaration): string {
-        let str = 'let ';
-        for (let i = 0, len = ast.declarations.length; i < len; i++) {
-            let d = ast.declarations[i];
+    };
+    TsMaker.prototype.codeFromVariableDeclaration = function (ast) {
+        var str = 'let ';
+        for (var i = 0, len = ast.declarations.length; i < len; i++) {
+            var d = ast.declarations[i];
             if (i > 0) {
                 str += ', ';
             }
             str += this.codeFromVariableDeclarator(d);
         }
         return str;
-    }
-
-    private codeFromVariableDeclarator(ast: VariableDeclarator): string {
-        (ast.id as any).__parent = ast;
-        let str = this.codeFromAST(ast.id);
+    };
+    TsMaker.prototype.codeFromVariableDeclarator = function (ast) {
+        ast.id.__parent = ast;
+        var str = this.codeFromAST(ast.id);
         if (ast.init) {
             str += ' = ' + this.codeFromAST(ast.init);
         }
         return str;
-    }
-
-    private codeFromWhileStatement(ast: WhileStatement): string {
-        let str = 'while(' + this.codeFromAST(ast.test) + ') {\n';
-        let bodyCode = this.indent(this.codeFromAST(ast.body));
+    };
+    TsMaker.prototype.codeFromWhileStatement = function (ast) {
+        var str = 'while(' + this.codeFromAST(ast.test) + ') {\n';
+        var bodyCode = this.indent(this.codeFromAST(ast.body));
         str += bodyCode + '\n}';
         return str;
-    }
-
-    private codeFromWithStatement(ast: WithStatement): string {
+    };
+    TsMaker.prototype.codeFromWithStatement = function (ast) {
         this.assert(false, ast, 'Not support WithStatement yet');
         return '';
-    }
-
-    private codeFromYieldExpression(ast: YieldExpression): string {
+    };
+    TsMaker.prototype.codeFromYieldExpression = function (ast) {
         this.assert(false, ast, 'Not support YieldExpression yet');
         return '';
-    }
-
-    private codeFromTSAbstractMethodDefinition(ast: TSAbstractMethodDefinition): string {
-        return this.codeFromMethodDefinition(ast as any);
-    }
-
-    private codeFromTSAsExpression(ast: TSAsExpression): string {
-        let str = this.codeFromAST(ast.expression);
-        let typeStr = this.codeFromAST(ast.typeAnnotation);
-        if(typeStr != 'Array') {
+    };
+    TsMaker.prototype.codeFromTSAbstractMethodDefinition = function (ast) {
+        return this.codeFromMethodDefinition(ast);
+    };
+    TsMaker.prototype.codeFromTSAsExpression = function (ast) {
+        var str = this.codeFromAST(ast.expression);
+        var typeStr = this.codeFromAST(ast.typeAnnotation);
+        if (typeStr != 'Array') {
             str += ' as ' + typeStr;
         }
         return str;
-    }
-
-    private codeFromTSDeclareFunction(ast: TSDeclareFunction): string {
+    };
+    TsMaker.prototype.codeFromTSDeclareFunction = function (ast) {
         this.assert(false, ast, 'Not support TSDeclareFunction yet');
         return '';
-    }
-
-    private codeFromTSEnumDeclaration(ast: TSEnumDeclaration): string {
+    };
+    TsMaker.prototype.codeFromTSEnumDeclaration = function (ast) {
         this.assert(false, ast, 'Not support TSEnumDeclaration yet');
         return '';
         // let str = '';
@@ -1423,74 +1237,68 @@ export class TsMaker {
         // this.assert(!ast.modifiers, ast);
         // this.assert(!ast.decorators, ast);
         // return '';
-    }
-
-    private codeFromTSInterfaceBody(ast: TSInterfaceBody): string {
-        let str = '';
-        for(let i = 0, len = ast.body.length; i < len; i++) {
-            if(i > 0) {
+    };
+    TsMaker.prototype.codeFromTSInterfaceBody = function (ast) {
+        var str = '';
+        for (var i = 0, len = ast.body.length; i < len; i++) {
+            if (i > 0) {
                 str += '\n';
             }
             str += this.codeFromAST(ast.body[i]);
         }
         return str;
-    }
-
-    private codeFromTSMethodSignature(ast: TSMethodSignature): string {
-        let str = '';
-        if(ast.accessibility) {
+    };
+    TsMaker.prototype.codeFromTSMethodSignature = function (ast) {
+        var str = '';
+        if (ast.accessibility) {
             str += ast.accessibility + ' ';
         }
-        if(ast.static) {
+        if (ast.static) {
             str += 'static ';
         }
-
         str += this.codeFromAST(ast.key) + '(';
         if (ast.params) {
-            for (let i = 0, len = ast.params.length; i < len; i++) {
+            for (var i = 0, len = ast.params.length; i < len; i++) {
                 if (i > 0) {
                     str += ', ';
                 }
-                let oneParam = ast.params[i];
-                (oneParam as any).__parent = ast;
-                (oneParam as any).__isFuncParam = true;
+                var oneParam = ast.params[i];
+                oneParam.__parent = ast;
+                oneParam.__isFuncParam = true;
                 str += this.codeFromAST(oneParam);
             }
         }
         str += ')';
-        if(ast.returnType) {
+        if (ast.returnType) {
             str += ': ' + this.codeFromAST(ast.returnType);
         }
         str += ';';
         return str;
-    }
-
-    private codeFromTSModuleBlock(ast: TSModuleBlock): string {
-        let str = '';
-        for(let i = 0, len = ast.body.length; i < len; i++) {
-            if(i > 0) {
+    };
+    TsMaker.prototype.codeFromTSModuleBlock = function (ast) {
+        var str = '';
+        for (var i = 0, len = ast.body.length; i < len; i++) {
+            if (i > 0) {
                 str += '\n';
             }
             str += this.codeFromAST(ast.body[i]);
         }
         return str;
-    }
-
-    private codeFromTSModuleDeclaration(ast: TSModuleDeclaration): string {
-        if(ast.body) {
+    };
+    TsMaker.prototype.codeFromTSModuleDeclaration = function (ast) {
+        if (ast.body) {
             return this.codeFromAST(ast.body);
         }
         return '';
-    }
-
-    private codeFromTSInterfaceDeclaration(ast: TSInterfaceDeclaration): string {
+    };
+    TsMaker.prototype.codeFromTSInterfaceDeclaration = function (ast) {
         this.assert(!ast.implements, ast, 'not support implements yet!');
-        let str = 'export interface ';
+        var str = 'export interface ';
         str += this.codeFromAST(ast.id) + ' ';
-        if(ast.extends) {
+        if (ast.extends) {
             str += 'extends ';
-            for(let i = 0, len = ast.extends.length; i < len; i++) {
-                if(i > 0) {
+            for (var i = 0, len = ast.extends.length; i < len; i++) {
+                if (i > 0) {
                     str += ', ';
                 }
                 str += this.codeFromAST(ast.extends[i]);
@@ -1501,54 +1309,50 @@ export class TsMaker {
         str += this.indent(this.codeFromAST(ast.body));
         str += '\n}';
         return str;
-    }
-
-    private codeFromTSTypeAssertion(ast: TSTypeAssertion): string {
+    };
+    TsMaker.prototype.codeFromTSTypeAssertion = function (ast) {
         this.assert(false, ast, 'Not support TSTypeAssertion yet');
         return '';
-    }
-
-    private codeFromTSTypeAnnotation(ast: TSTypeAnnotation): string {
-        let str = this.codeFromAST(ast.typeAnnotation);
-        if(str == 'Array') str = 'any[]';
+    };
+    TsMaker.prototype.codeFromTSTypeAnnotation = function (ast) {
+        var str = this.codeFromAST(ast.typeAnnotation);
+        if (str == 'Array')
+            str = 'any[]';
         return str;
-    }
-
-    private codeFromTSTypeParameterInstantiation(ast: TSTypeParameterInstantiation): string {
-        let str = '';
-        for(let i = 0, len = ast.params.length; i < len; i++) {
-            if(i > 0) {
+    };
+    TsMaker.prototype.codeFromTSTypeParameterInstantiation = function (ast) {
+        var str = '';
+        for (var i = 0, len = ast.params.length; i < len; i++) {
+            if (i > 0) {
                 str += ', ';
             }
-            (ast.params[i] as any).__isType = true;
-            let pstr = this.codeFromAST(ast.params[i]);
+            ast.params[i].__isType = true;
+            var pstr = this.codeFromAST(ast.params[i]);
             str += pstr;
         }
         return str;
-    }
-
-    private codeFromTSTypeReference(ast: TSTypeReference): string {
-        (ast.typeName as any).__isType = true;
-        let str = this.codeFromAST(ast.typeName);
-        if(ast.typeParameters) {
+    };
+    TsMaker.prototype.codeFromTSTypeReference = function (ast) {
+        ast.typeName.__isType = true;
+        var str = this.codeFromAST(ast.typeName);
+        if (ast.typeParameters) {
             str += '<' + this.codeFromAST(ast.typeParameters) + '>';
-        } 
+        }
         return str;
-    }
-
-    private codeFromTSVoidKeyword(ast: TSVoidKeyword): string {
+    };
+    TsMaker.prototype.codeFromTSVoidKeyword = function (ast) {
         return 'void';
-    }
-
-    private indent(str: string, fromLine: number = 0): string {
-        let indentStr = '    ';
+    };
+    TsMaker.prototype.indent = function (str, fromLine) {
+        if (fromLine === void 0) { fromLine = 0; }
+        var indentStr = '    ';
         // for(let i = 0; i < blockDeep; i++) {
         //   indentStr += '  ';
         // }
-        let endWithNewLine = str.substr(str.length - 1) == '\n';
-        let lines = str.split(/\n/);
-        let newStr = '';
-        for (let i = 0, len = lines.length; i < len; i++) {
+        var endWithNewLine = str.substr(str.length - 1) == '\n';
+        var lines = str.split(/\n/);
+        var newStr = '';
+        for (var i = 0, len = lines.length; i < len; i++) {
             if (i > 0) {
                 newStr += '\n';
             }
@@ -1561,52 +1365,51 @@ export class TsMaker {
             newStr += '\n';
         }
         return newStr;
-    }
-
-    private isSimpleType(type: string): boolean {
-        if(this.simpleTypes.indexOf(type) >= 0) {
+    };
+    TsMaker.prototype.isSimpleType = function (type) {
+        if (this.simpleTypes.indexOf(type) >= 0) {
             return true;
         }
         return false;
-    }
-
-    private getMemberInfo(classInfo: ClassInfo, pname: string): PropertyInfo {
-        let finfo = classInfo.functionMap[pname];
-        if(finfo) return finfo;
-        let pinfo = classInfo.propertyMap[pname];
-        if(pinfo) return pinfo;
-
-        while(classInfo.superClass) {
+    };
+    TsMaker.prototype.getMemberInfo = function (classInfo, pname) {
+        var finfo = classInfo.functionMap[pname];
+        if (finfo)
+            return finfo;
+        var pinfo = classInfo.propertyMap[pname];
+        if (pinfo)
+            return pinfo;
+        while (classInfo.superClass) {
             classInfo = this.analysor.classMap[classInfo.superClass];
-            if(classInfo) {
-                let finfo = classInfo.functionMap[pname];
-                if(finfo && finfo.accessibility != 'private') {
-                    return finfo;
+            if (classInfo) {
+                var finfo_1 = classInfo.functionMap[pname];
+                if (finfo_1 && finfo_1.accessibility != 'private') {
+                    return finfo_1;
                 }
-                let pinfo = classInfo.propertyMap[pname];
-                if(pinfo && pinfo.accessibility != 'private') {
-                    return pinfo;
+                var pinfo_1 = classInfo.propertyMap[pname];
+                if (pinfo_1 && pinfo_1.accessibility != 'private') {
+                    return pinfo_1;
                 }
-            } else {
+            }
+            else {
                 break;
             }
         }
         return null;
-    }
-  
-    private assert(cond: boolean, ast: BaseNode, message: string = null) {
+    };
+    TsMaker.prototype.assert = function (cond, ast, message) {
+        if (message === void 0) { message = null; }
         if (!cond) {
             if (this.option.errorDetail) {
                 console.log(util.inspect(ast, true, 6));
             }
-            console.log('\x1B[36m%s\x1B[0m(tmp/tmp.ts:\x1B[33m%d:%d\x1B[0m) - \x1B[31merror\x1B[0m: %s', this.relativePath, 
-                ast.loc ? ast.loc.start.line : -1, 
-                ast.loc ? ast.loc.start.column : -1, 
-                message ? message : 'Error');
-            console.log(As2TsHints.ContactMsg);
-            if(this.option.terminateWhenError) {
+            console.log('\x1B[36m%s\x1B[0m(tmp/tmp.ts:\x1B[33m%d:%d\x1B[0m) - \x1B[31merror\x1B[0m: %s', this.relativePath, ast.loc ? ast.loc.start.line : -1, ast.loc ? ast.loc.start.column : -1, message ? message : 'Error');
+            console.log(Strings_1.As2TsHints.ContactMsg);
+            if (this.option.terminateWhenError) {
                 throw new Error('[As2TS]Something wrong encountered.');
             }
         }
-    }
-}
+    };
+    return TsMaker;
+}());
+exports.TsMaker = TsMaker;

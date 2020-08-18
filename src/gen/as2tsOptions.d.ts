@@ -1,13 +1,13 @@
 export interface As2TsImportRule {
     "fromModule"?: {
         "module": string, 
-        "regular": RegExp
+        "regular": string
     }[]
 }
 
 export interface As2TsSkipRule {
-    "dirs"?: RegExp[], 
-    "files"?: RegExp[]
+    "dirs"?: string[], 
+    "files"?: string[]
 }
 
 export interface As2TsOption {

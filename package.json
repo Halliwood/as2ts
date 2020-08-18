@@ -2,9 +2,9 @@
   "name": "as2ts",
   "version": "1.0.0",
   "description": "An useful tool to translate actionscript code to typescript.",
-  "main": "as2ts.js",
+  "main": "bin/index.js",
   "scripts": {
-    "test": "tsc && node index.js"
+    "test": "tsc && node bin/index.js -s E:\\qhgame\\trunk\\project\\src\\ --dist E:\\qhgame\\tsproj\\src\\ -r example\\rule.json"
   },
   "repository": {
     "type": "git",
@@ -30,6 +30,7 @@
   },
   "dependencies": {
     "@typescript-eslint/typescript-estree": "^3.9.0",
+    "commander": "^6.0.0",
     "typescript": "^3.9.7"
   }
 }

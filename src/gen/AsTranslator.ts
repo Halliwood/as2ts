@@ -1,6 +1,6 @@
 import * as fs from "fs";
 
-export class As2Ts {
+export class AsTranslator {
     translate(inAsFile: string): string {
         let asContent = fs.readFileSync(inAsFile, 'utf-8');
         let classMatchRst = asContent.match(/class\s+(\w+)/);

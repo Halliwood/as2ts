@@ -1,0 +1,25 @@
+{
+    "skipRule": {
+        "dirs": ["^\bui\b", "^automatic"], 
+        "files": ["MsgPool.as", "FyMsg.as", "DecodeUtil.as", "EncodeUtil.as", "SendMsgUtil.as"]
+    }, 
+    "idReplacement": {
+        "KW": "KeyWord"
+    }, 
+    "literalReplacement": {
+        "\"automatic/constants/KW\"": "\"automatic/constants/KeyWord\""
+    }, 
+    "importRule": {
+        "fromModule": [
+            {"module": "Laya", "regular": "^laya" }, 
+            {"module": "ui", "regular": "^ui/" }, 
+            {"module": "Protocol", "regular": "^automatic/protocol/(?!Macros|ErrorId)" }, 
+            {"module": "GameConfig", "regular": "^automatic/cfgs" }
+        ]
+    }, 
+    "tsLibs": ["E:/qhgame/tsproj/src/ui/layaUI.max.all.ts"], 
+    "errorDetail": true, 
+    "terminateWhenError": true, 
+    "continueLast": false, 
+    "tmpRoot": "tmp/"
+}

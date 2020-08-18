@@ -1,2 +1,8 @@
-# as2ts
-A great perl script to translate actionscript 3 to typescript. Useful for h5 game developer!
+# AS2TS
+----------------------------
+本工具可以帮助你将Actionscript3.0项目完美地转换为Typescript项目，特别适合于早期使用Laya1.0+AS2开发项目的你。
+
+# AS2TS与众不同的特点
+----------------------------
+* 智能添加this指针
+* 智能导入import
