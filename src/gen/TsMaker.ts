@@ -17,6 +17,8 @@ export class TsMaker {
     private analysor: TsAnalysor;
     private readonly simpleTypes: string[] = ['number', 'string', 'boolean', 'any', 'Array', '[]', 'Object', 'void'];
     private readonly parentNoThis = [AST_NODE_TYPES.Property, AST_NODE_TYPES.VariableDeclarator];
+    private readonly noSemecolonTypes = [AST_NODE_TYPES.WhileStatement, AST_NODE_TYPES.DoWhileStatement, AST_NODE_TYPES.ForInStatement, AST_NODE_TYPES.ForOfStatement, 
+        AST_NODE_TYPES.ForStatement, AST_NODE_TYPES.IfStatement, AST_NODE_TYPES.SwitchStatement];
 
     private relativePath: string;
     private crtClass: ClassInfo;
@@ -635,7 +637,10 @@ export class TsMaker {
                 if (i > 0) {
                     str += '\n';
                 }
-                str += bstr + ';';
+                str += bstr;
+                if(this.noSemecolonTypes.indexOf(bodyEle.type) < 0) {
+                    str += ';';
+                }
             }
         }
         return str;
@@ -983,7 +988,9 @@ export class TsMaker {
             }
         }
         if(ast.typeAnnotation) {
-            str += ': ' + this.codeFromAST(ast.typeAnnotation);
+            if(!(ast as any).__parent || !(ast as any).__parent.__parent || !(ast as any).__parent.__parent.__parent || AST_NODE_TYPES.ForInStatement != (ast as any).__parent.__parent.__parent.type) {
+                str += ': ' + this.codeFromAST(ast.typeAnnotation);
+            }
         } else if((ast as any).__isType) {
             let mapped = this.option.typeMapper[str];
             if(mapped) str = mapped;
@@ -1315,7 +1322,11 @@ export class TsMaker {
             agm = '(' + agm + ')';
         }
         if (ast.prefix) {
-            str = ast.operator + agm;
+            str = ast.operator;
+            if(str == 'delete') {
+                str += ' ';
+            }
+            str += agm;
         } else {
             str = agm + ast.operator;
         }
@@ -1339,6 +1350,7 @@ export class TsMaker {
         let str = 'let ';
         for (let i = 0, len = ast.declarations.length; i < len; i++) {
             let d = ast.declarations[i];
+            (d as any).__parent = ast;
             if (i > 0) {
                 str += ', ';
             }

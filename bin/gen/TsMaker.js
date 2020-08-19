@@ -11,6 +11,8 @@ var TsMaker = /** @class */ (function () {
         this.operatorPriorityMap = {};
         this.simpleTypes = ['number', 'string', 'boolean', 'any', 'Array', '[]', 'Object', 'void'];
         this.parentNoThis = [typescript_estree_1.AST_NODE_TYPES.Property, typescript_estree_1.AST_NODE_TYPES.VariableDeclarator];
+        this.noSemecolonTypes = [typescript_estree_1.AST_NODE_TYPES.WhileStatement, typescript_estree_1.AST_NODE_TYPES.DoWhileStatement, typescript_estree_1.AST_NODE_TYPES.ForInStatement, typescript_estree_1.AST_NODE_TYPES.ForOfStatement,
+            typescript_estree_1.AST_NODE_TYPES.ForStatement, typescript_estree_1.AST_NODE_TYPES.IfStatement, typescript_estree_1.AST_NODE_TYPES.SwitchStatement];
         this.analysor = analysor;
         this.option = option || {};
         this.setPriority(['( … )'], this.pv++);
@@ -505,7 +507,10 @@ var TsMaker = /** @class */ (function () {
                 if (i > 0) {
                     str += '\n';
                 }
-                str += bstr + ';';
+                str += bstr;
+                if (this.noSemecolonTypes.indexOf(bodyEle.type) < 0) {
+                    str += ';';
+                }
             }
         }
         return str;
@@ -829,7 +834,9 @@ var TsMaker = /** @class */ (function () {
             }
         }
         if (ast.typeAnnotation) {
-            str += ': ' + this.codeFromAST(ast.typeAnnotation);
+            if (!ast.__parent || !ast.__parent.__parent || !ast.__parent.__parent.__parent || typescript_estree_1.AST_NODE_TYPES.ForInStatement != ast.__parent.__parent.__parent.type) {
+                str += ': ' + this.codeFromAST(ast.typeAnnotation);
+            }
         }
         else if (ast.__isType) {
             var mapped = this.option.typeMapper[str];
@@ -1137,7 +1144,11 @@ var TsMaker = /** @class */ (function () {
             agm = '(' + agm + ')';
         }
         if (ast.prefix) {
-            str = ast.operator + agm;
+            str = ast.operator;
+            if (str == 'delete') {
+                str += ' ';
+            }
+            str += agm;
         }
         else {
             str = agm + ast.operator;
@@ -1161,6 +1172,7 @@ var TsMaker = /** @class */ (function () {
         var str = 'let ';
         for (var i = 0, len = ast.declarations.length; i < len; i++) {
             var d = ast.declarations[i];
+            d.__parent = ast;
             if (i > 0) {
                 str += ', ';
             }
