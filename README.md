@@ -50,7 +50,7 @@ as2ts-smart -s E:\\asproj\\src\\ --dist E:\\tsproj\\src\\ -r E:\\rule.json
 ### 使用配置文件自定义翻译规则
 
 as2ts-smart支持你通过配置文件自定义翻译规则，配置文件需要为一个JSON文件。
-配置文件的格式定义如下，请参见[As2TsOption]((./typings/index.d.ts))
+配置文件的格式定义如下，请参见[As2TsOption](./typings/index.d.ts)
 
 ```TypeScript
 export interface As2TsOption {
@@ -84,7 +84,7 @@ export interface As2TsOption {
 如下是一个配置例子，请参见[rule.json](./example/rule.json)
 
 #### skipRule
-  此项用于在翻译时忽略部分文件，其格式定义如下，请参见[As2TsSkipRule]((./typings/index.d.ts))
+  此项用于在翻译时忽略部分文件，其格式定义如下，请参见[As2TsSkipRule](./typings/index.d.ts)
 
 ```TypeScript
 export interface As2TsSkipRule {
@@ -148,7 +148,7 @@ export interface As2TsSkipRule {
 ```
 
 #### importRule
-  此项用于将AS的包按照指定的规则转换为TS的模块，其格式定义如下，请参见[As2TsImportRule]((./typings/index.d.ts))。
+  此项用于将AS的包按照指定的规则转换为TS的模块，其格式定义如下，请参见[As2TsImportRule](./typings/index.d.ts)。
   
 ```TypeScript
 export interface As2TsImportRule {
