@@ -14,7 +14,7 @@
             {"module": "Laya", "regular": "^laya" }, 
             {"module": "ui", "regular": "^ui/" }, 
             {"module": "Protocol", "regular": "^automatic/protocol/(?!Macros|ErrorId)" }, 
-            {"module": "GameConfig", "regular": "^automatic/cfgs" }
+            {"module": "GameConfig", "regular": "^automatic/cfgs/(?!ConfigDecoder)" }
         ]
     }, 
     "tsLibs": ["E:/qhgame/tsproj/src/ui/layaUI.max.all.ts"], 

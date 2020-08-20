@@ -613,7 +613,7 @@ export class TsMaker {
         (ast.left as any).__parent = ast;
         (ast.right as any).__parent = ast;
         let left = this.codeFromAST(ast.left);
-        if (this.calPriority(ast.left) >= this.calPriority(ast)) {
+        if (this.calPriority(ast.left) > this.calPriority(ast)) {
             left = '(' + left + ')';
         }
         let right = this.codeFromAST(ast.right);
@@ -968,9 +968,12 @@ export class TsMaker {
         if(this.option.idReplacement && typeof(this.option.idReplacement[str]) === 'string') {
             str = this.option.idReplacement[str];
         }
-        if(this.startAddThis && null != this.crtClass && null != this.crtFunc && 
-            (!(ast as any).__parent || this.parentNoThis.indexOf((ast as any).__parent.type) < 0 && ((ast as any).__parent.type != AST_NODE_TYPES.MemberExpression || ((ast as any).__parent as MemberExpression).computed))) {
-            if(this.crtFunc.params.indexOf(str) < 0) {
+        if(this.startAddThis && null != this.crtClass && null != this.crtFunc) {
+            if((ast as any).__parent && (ast as any).__parent.type == AST_NODE_TYPES.VariableDeclarator) { 
+                this.crtFunc.localVars.push(str);
+            }
+            else if((!(ast as any).__parent || this.parentNoThis.indexOf((ast as any).__parent.type) < 0 && ((ast as any).__parent.type != AST_NODE_TYPES.MemberExpression || ((ast as any).__parent as MemberExpression).computed)) && 
+            this.crtFunc.params.indexOf(str) < 0 && this.crtFunc.localVars.indexOf(str) < 0) {
                 let minfo = this.getMemberInfo(this.crtClass, str);
                 if(minfo) {
                     if(minfo.static) {

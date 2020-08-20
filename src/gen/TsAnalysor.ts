@@ -26,6 +26,7 @@ export class PropertyInfo {
 
 export class FunctionInfo extends PropertyInfo {
     params: string[] = [];
+    localVars: string[] = [];
 
     toString(): string {
         return super.toString() + '(' + this.params.join(', ') + ')';

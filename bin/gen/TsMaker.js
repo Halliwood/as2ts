@@ -486,7 +486,7 @@ var TsMaker = /** @class */ (function () {
         ast.left.__parent = ast;
         ast.right.__parent = ast;
         var left = this.codeFromAST(ast.left);
-        if (this.calPriority(ast.left) >= this.calPriority(ast)) {
+        if (this.calPriority(ast.left) > this.calPriority(ast)) {
             left = '(' + left + ')';
         }
         var right = this.codeFromAST(ast.right);
@@ -811,9 +811,12 @@ var TsMaker = /** @class */ (function () {
         if (this.option.idReplacement && typeof (this.option.idReplacement[str]) === 'string') {
             str = this.option.idReplacement[str];
         }
-        if (this.startAddThis && null != this.crtClass && null != this.crtFunc &&
-            (!ast.__parent || this.parentNoThis.indexOf(ast.__parent.type) < 0 && (ast.__parent.type != typescript_estree_1.AST_NODE_TYPES.MemberExpression || ast.__parent.computed))) {
-            if (this.crtFunc.params.indexOf(str) < 0) {
+        if (this.startAddThis && null != this.crtClass && null != this.crtFunc) {
+            if (ast.__parent && ast.__parent.type == typescript_estree_1.AST_NODE_TYPES.VariableDeclarator) {
+                this.crtFunc.localVars.push(str);
+            }
+            else if ((!ast.__parent || this.parentNoThis.indexOf(ast.__parent.type) < 0 && (ast.__parent.type != typescript_estree_1.AST_NODE_TYPES.MemberExpression || ast.__parent.computed)) &&
+                this.crtFunc.params.indexOf(str) < 0 && this.crtFunc.localVars.indexOf(str) < 0) {
                 var minfo = this.getMemberInfo(this.crtClass, str);
                 if (minfo) {
                     if (minfo.static) {
