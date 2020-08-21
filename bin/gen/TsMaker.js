@@ -6,6 +6,7 @@ var util = require("util");
 var Strings_1 = require("./Strings");
 var TsMaker = /** @class */ (function () {
     function TsMaker(analysor, option) {
+        this.TagAddImport = '[as2ts_import]';
         // 运算符优先级
         this.pv = 0;
         this.operatorPriorityMap = {};
@@ -125,19 +126,24 @@ var TsMaker = /** @class */ (function () {
         this.importedMap = {};
         this.relativePath = relativePath;
         var str = this.codeFromAST(ast);
+        var importStr = '';
         for (var i = 0, len = this.allTypes.length; i < len; i++) {
             var type = this.allTypes[i];
             if (!this.importedMap[type] && !this.isSimpleType(type)) {
                 var classInfo = this.analysor.classMap[type];
                 if (classInfo) {
-                    var mstr = classInfo.module;
-                    if (mstr.charAt(mstr.length - 1) != '/') {
-                        mstr += '/';
+                    var mstr = classInfo.module.replace(/\//g, '.');
+                    if (mstr.charAt(mstr.length - 1) != '.') {
+                        mstr += '.';
                     }
-                    str = 'import {' + type + '} from "' + mstr + type + '"\n' + str;
+                    importStr += 'import ' + type + ' = ' + mstr + type + ';\n';
                 }
             }
         }
+        if (importStr) {
+            importStr = this.indent(importStr);
+        }
+        str = str.replace(this.TagAddImport, importStr);
         return str;
     };
     // private processAST(ast: any) {
@@ -888,10 +894,10 @@ var TsMaker = /** @class */ (function () {
         if (cnt == 0)
             return '';
         var sourceStr;
+        var sourceValue = ast.source.value;
         if (this.option.importRule && this.option.importRule.fromModule) {
             for (var _i = 0, _a = this.option.importRule.fromModule; _i < _a.length; _i++) {
                 var fm = _a[_i];
-                var sourceValue = ast.source.value;
                 if (new RegExp(fm.regular).test(sourceValue)) {
                     sourceStr = ' = ' + fm.module + '.' + sourceValue.substr(sourceValue.lastIndexOf('/') + 1);
                     break;
@@ -899,10 +905,11 @@ var TsMaker = /** @class */ (function () {
             }
         }
         if (!sourceStr) {
-            specifierStr = '{' + specifierStr + '}';
-            sourceStr = ' from ' + this.codeFromAST(ast.source);
+            // specifierStr = '{' + specifierStr + '}';
+            // sourceStr = ' from ' + this.codeFromAST(ast.source);
+            sourceStr = ' = ' + sourceValue.replace(/\//g, '.');
         }
-        str += specifierStr + sourceStr;
+        str += specifierStr + sourceStr + ';';
         return str;
     };
     TsMaker.prototype.codeFromImportDefaultSpecifier = function (ast) {
@@ -1301,10 +1308,25 @@ var TsMaker = /** @class */ (function () {
         return str;
     };
     TsMaker.prototype.codeFromTSModuleDeclaration = function (ast) {
-        if (ast.body) {
-            return this.codeFromAST(ast.body);
+        var str = '';
+        if (!ast.__parent || typescript_estree_1.AST_NODE_TYPES.TSModuleDeclaration != ast.__parent.type) {
+            str = 'module ';
         }
-        return '';
+        else {
+            str = '.';
+        }
+        str += this.codeFromAST(ast.id);
+        ast.body.__parent = ast;
+        if (ast.body.type != typescript_estree_1.AST_NODE_TYPES.TSModuleDeclaration) {
+            str += ' {\n';
+            str += this.TagAddImport;
+            str += this.indent(this.codeFromAST(ast.body));
+            str += '\n}';
+        }
+        else {
+            str += this.codeFromAST(ast.body);
+        }
+        return str;
     };
     TsMaker.prototype.codeFromTSInterfaceDeclaration = function (ast) {
         this.assert(!ast.implements, ast, 'not support implements yet!');

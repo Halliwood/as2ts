@@ -7,6 +7,7 @@ import {TsAnalysor, ClassInfo, FunctionInfo, PropertyInfo} from './TsAnalysor';
 import { As2TsHints } from './Strings';
 
 export class TsMaker {
+    private readonly TagAddImport = '[as2ts_import]';
     
     // 运算符优先级
     private pv = 0;
@@ -155,19 +156,24 @@ export class TsMaker {
         this.relativePath = relativePath;
         let str = this.codeFromAST(ast);
 
+        let importStr = '';
         for(let i = 0, len = this.allTypes.length; i < len; i++) {
             let type = this.allTypes[i];
             if(!this.importedMap[type] && !this.isSimpleType(type)) {
                 let classInfo = this.analysor.classMap[type];
                 if(classInfo) {
-                    let mstr = classInfo.module;
-                    if(mstr.charAt(mstr.length - 1) != '/') {
-                        mstr += '/';
+                    let mstr = classInfo.module.replace(/\//g, '.');
+                    if(mstr.charAt(mstr.length - 1) != '.') {
+                        mstr += '.';
                     }
-                    str = 'import {' + type + '} from "' + mstr + type + '"\n' + str;
+                    importStr += 'import ' + type + ' = ' + mstr + type + ';\n';
                 }                
             }
         }
+        if(importStr) {
+            importStr = this.indent(importStr);
+        }
+        str = str.replace(this.TagAddImport, importStr);
         return str;
     }
 
@@ -1039,9 +1045,9 @@ export class TsMaker {
         }
         if(cnt == 0) return '';
         let sourceStr: string;
+        let sourceValue = ast.source.value as string;
         if(this.option.importRule && this.option.importRule.fromModule) {
             for(let fm of this.option.importRule.fromModule) {
-                let sourceValue = ast.source.value as string;
                 if(new RegExp(fm.regular).test(sourceValue)) {
                     sourceStr = ' = ' + fm.module + '.' + sourceValue.substr(sourceValue.lastIndexOf('/') + 1);
                     break;
@@ -1049,10 +1055,11 @@ export class TsMaker {
             }
         }
         if(!sourceStr) {
-            specifierStr = '{' + specifierStr + '}';
-            sourceStr = ' from ' + this.codeFromAST(ast.source);
+            // specifierStr = '{' + specifierStr + '}';
+            // sourceStr = ' from ' + this.codeFromAST(ast.source);
+            sourceStr = ' = ' + sourceValue.replace(/\//g, '.');
         }
-        str += specifierStr + sourceStr;
+        str += specifierStr + sourceStr + ';';
         return str;
     }
 
@@ -1492,10 +1499,23 @@ export class TsMaker {
     }
 
     private codeFromTSModuleDeclaration(ast: TSModuleDeclaration): string {
-        if(ast.body) {
-            return this.codeFromAST(ast.body);
+        let str = '';
+        if(!(ast as any).__parent || AST_NODE_TYPES.TSModuleDeclaration != (ast as any).__parent.type) {
+            str = 'module ';
+        } else {
+            str = '.';
         }
-        return '';
+        str += this.codeFromAST(ast.id);
+        (ast.body as any).__parent = ast;
+        if((ast.body as any).type != AST_NODE_TYPES.TSModuleDeclaration) {
+            str += ' {\n';
+            str += this.TagAddImport;
+            str += this.indent(this.codeFromAST(ast.body));
+            str += '\n}';
+        } else {
+            str += this.codeFromAST(ast.body);
+        }
+        return str;
     }
 
     private codeFromTSInterfaceDeclaration(ast: TSInterfaceDeclaration): string {

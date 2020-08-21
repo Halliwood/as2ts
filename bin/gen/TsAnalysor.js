@@ -254,13 +254,17 @@ var TsAnalysor = /** @class */ (function () {
         for (var i = 0, len = ast.body.length; i < len; i++) {
             this.processAST(ast.body[i]);
         }
+        this.crtModule = null;
     };
     TsAnalysor.prototype.processTSModuleDeclaration = function (ast) {
-        this.crtModule = this.codeFromAST(ast.id);
-        if (ast.body) {
-            this.processAST(ast.body);
+        var mid = this.codeFromAST(ast.id);
+        if (this.crtModule) {
+            this.crtModule += '.' + mid;
         }
-        this.crtModule = null;
+        else {
+            this.crtModule = mid;
+        }
+        this.processAST(ast.body);
     };
     TsAnalysor.prototype.processTSInterfaceDeclaration = function (ast) {
         var className = this.codeFromAST(ast.id);

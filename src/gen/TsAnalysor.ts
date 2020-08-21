@@ -282,14 +282,17 @@ export class TsAnalysor {
         for(let i = 0, len = ast.body.length; i < len; i++) {
             this.processAST(ast.body[i]);
         }
+        this.crtModule = null;
     }
 
     private processTSModuleDeclaration(ast: TSModuleDeclaration) {
-        this.crtModule = this.codeFromAST(ast.id);
-        if(ast.body) {
-            this.processAST(ast.body);
+        let mid = this.codeFromAST(ast.id);
+        if(this.crtModule) {
+            this.crtModule += '.' + mid;
+        } else {
+            this.crtModule = mid;
         }
-        this.crtModule = null;
+        this.processAST(ast.body);
     }
 
     private processTSInterfaceDeclaration(ast: TSInterfaceDeclaration) {
