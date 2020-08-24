@@ -1049,7 +1049,11 @@ export class TsMaker {
         if(this.option.importRule && this.option.importRule.fromModule) {
             for(let fm of this.option.importRule.fromModule) {
                 if(new RegExp(fm.regular).test(sourceValue)) {
-                    sourceStr = ' = ' + fm.module + '.' + sourceValue.substr(sourceValue.lastIndexOf('/') + 1);
+                    let idStr = sourceValue.substr(sourceValue.lastIndexOf('/') + 1);
+                    if(this.option.idReplacement && typeof(this.option.idReplacement[idStr]) === 'string') {
+                        idStr = this.option.idReplacement[idStr];
+                    }
+                    sourceStr = ' = ' + fm.module + '.' + idStr;
                     break;
                 }
             }
@@ -1057,7 +1061,17 @@ export class TsMaker {
         if(!sourceStr) {
             // specifierStr = '{' + specifierStr + '}';
             // sourceStr = ' from ' + this.codeFromAST(ast.source);
-            sourceStr = ' = ' + sourceValue.replace(/\//g, '.');
+            let mstr = sourceValue.replace(/\//g, '.');
+            let dotPos = mstr.lastIndexOf('.');
+            if(dotPos > 0) {
+                let idStr = mstr.substr(dotPos + 1);
+                if(this.option.idReplacement && typeof(this.option.idReplacement[idStr]) === 'string') {
+                    idStr = this.option.idReplacement[idStr];
+                    let preIdStr = mstr.substring(0, dotPos);
+                    mstr = preIdStr + '.' + idStr;
+                }
+            }
+            sourceStr = ' = ' + mstr;
         }
         str += specifierStr + sourceStr + ';';
         return str;

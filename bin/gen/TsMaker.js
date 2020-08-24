@@ -899,7 +899,11 @@ var TsMaker = /** @class */ (function () {
             for (var _i = 0, _a = this.option.importRule.fromModule; _i < _a.length; _i++) {
                 var fm = _a[_i];
                 if (new RegExp(fm.regular).test(sourceValue)) {
-                    sourceStr = ' = ' + fm.module + '.' + sourceValue.substr(sourceValue.lastIndexOf('/') + 1);
+                    var idStr = sourceValue.substr(sourceValue.lastIndexOf('/') + 1);
+                    if (this.option.idReplacement && typeof (this.option.idReplacement[idStr]) === 'string') {
+                        idStr = this.option.idReplacement[idStr];
+                    }
+                    sourceStr = ' = ' + fm.module + '.' + idStr;
                     break;
                 }
             }
@@ -907,7 +911,17 @@ var TsMaker = /** @class */ (function () {
         if (!sourceStr) {
             // specifierStr = '{' + specifierStr + '}';
             // sourceStr = ' from ' + this.codeFromAST(ast.source);
-            sourceStr = ' = ' + sourceValue.replace(/\//g, '.');
+            var mstr = sourceValue.replace(/\//g, '.');
+            var dotPos = mstr.lastIndexOf('.');
+            if (dotPos > 0) {
+                var idStr = mstr.substr(dotPos + 1);
+                if (this.option.idReplacement && typeof (this.option.idReplacement[idStr]) === 'string') {
+                    idStr = this.option.idReplacement[idStr];
+                    var preIdStr = mstr.substring(0, dotPos);
+                    mstr = preIdStr + '.' + idStr;
+                }
+            }
+            sourceStr = ' = ' + mstr;
         }
         str += specifierStr + sourceStr + ';';
         return str;
