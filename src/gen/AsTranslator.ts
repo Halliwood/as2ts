@@ -20,8 +20,10 @@ export class AsTranslator {
         // }
         // package改成module
         asContent = asContent.replace(/\bpackage\b(?=[\s\{])/, 'module');
+        // 解决默认包的情况
+        asContent = asContent.replace(/^(\s*)\bmodule\b(\s*)(?=\{)/, '$1module _EMPTYMODULE_$2');
         // 修改import
-        let iptRe = new RegExp(/\s*import\s+([\w\.]+)\s?;*/);
+        let iptRe = new RegExp(/^\s*import\s+([\w\.]+)\s?;*/);
         let asLines = asContent.split(/[\r\n]+/);
         for(let i = 0, len = asLines.length; i < len; i++) {
             let oneLine = asLines[i];

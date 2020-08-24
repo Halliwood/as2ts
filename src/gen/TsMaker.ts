@@ -1519,15 +1519,21 @@ export class TsMaker {
         } else {
             str = '.';
         }
-        str += this.codeFromAST(ast.id);
+        let idStr = this.codeFromAST(ast.id);
         (ast.body as any).__parent = ast;
-        if((ast.body as any).type != AST_NODE_TYPES.TSModuleDeclaration) {
-            str += ' {\n';
-            str += this.TagAddImport;
-            str += this.indent(this.codeFromAST(ast.body));
-            str += '\n}';
+        let bodyStr = this.codeFromAST(ast.body);
+        if(idStr != '_EMPTYMODULE_') {
+            str += idStr;
+            if((ast.body as any).type != AST_NODE_TYPES.TSModuleDeclaration) {
+                str += ' {\n';
+                str += this.TagAddImport;
+                str += this.indent(bodyStr);
+                str += '\n}';
+            } else {
+                str += bodyStr;
+            }
         } else {
-            str += this.codeFromAST(ast.body);
+            str = bodyStr;
         }
         return str;
     }

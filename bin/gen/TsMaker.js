@@ -1329,16 +1329,23 @@ var TsMaker = /** @class */ (function () {
         else {
             str = '.';
         }
-        str += this.codeFromAST(ast.id);
+        var idStr = this.codeFromAST(ast.id);
         ast.body.__parent = ast;
-        if (ast.body.type != typescript_estree_1.AST_NODE_TYPES.TSModuleDeclaration) {
-            str += ' {\n';
-            str += this.TagAddImport;
-            str += this.indent(this.codeFromAST(ast.body));
-            str += '\n}';
+        var bodyStr = this.codeFromAST(ast.body);
+        if (idStr != '_EMPTYMODULE_') {
+            str += idStr;
+            if (ast.body.type != typescript_estree_1.AST_NODE_TYPES.TSModuleDeclaration) {
+                str += ' {\n';
+                str += this.TagAddImport;
+                str += this.indent(bodyStr);
+                str += '\n}';
+            }
+            else {
+                str += bodyStr;
+            }
         }
         else {
-            str += this.codeFromAST(ast.body);
+            str = bodyStr;
         }
         return str;
     };

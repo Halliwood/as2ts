@@ -43,8 +43,10 @@ var AsTranslator = /** @class */ (function () {
         // }
         // package改成module
         asContent = asContent.replace(/\bpackage\b(?=[\s\{])/, 'module');
+        // 解决默认包的情况
+        asContent = asContent.replace(/^(\s*)\bmodule\b(\s*)(?=\{)/, '$1module _EMPTYMODULE_$2');
         // 修改import
-        var iptRe = new RegExp(/\s*import\s+([\w\.]+)\s?;*/);
+        var iptRe = new RegExp(/^\s*import\s+([\w\.]+)\s?;*/);
         var asLines = asContent.split(/[\r\n]+/);
         for (var i = 0, len = asLines.length; i < len; i++) {
             var oneLine = asLines[i];
