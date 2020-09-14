@@ -12,10 +12,12 @@
     "importRule": {
         "fromModule": [
             {"module": "Protocol", "regular": "^automatic/protocol/(?!Macros|ErrorId)" }, 
-            {"module": "GameConfig", "regular": "^automatic/cfgs/(?!ConfigDecoder)" }
+            {"module": "GameConfig", "regular": "^automatic/cfgs/(?!ConfigDecoder)" }, 
+            {"module": "Laya", "regular": "^laya/" }
         ]
     }, 
     "tsLibs": ["E:/qhgame/tsproj/src/ui/layaUI.max.all.ts"], 
+    "noModule": true, 
     "errorDetail": true, 
     "terminateWhenError": true, 
     "continueLast": false, 

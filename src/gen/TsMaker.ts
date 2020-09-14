@@ -1,6 +1,6 @@
 import { Accessibility, ArrayExpression, ArrayPattern, ArrowFunctionExpression, AssignmentExpression, AssignmentPattern, AwaitExpression, BigIntLiteral, BinaryExpression, BlockStatement, BreakStatement, CallExpression, CatchClause, ClassBody, ClassDeclaration, ClassExpression, ClassProperty, ConditionalExpression, ContinueStatement, DebuggerStatement, Decorator, DoWhileStatement, EmptyStatement, ExportAllDeclaration, ExportDefaultDeclaration, ExportNamedDeclaration, ExportSpecifier, ExpressionStatement, ForInStatement, ForOfStatement, ForStatement, FunctionDeclaration, FunctionExpression, Identifier, IfStatement, ImportDeclaration, ImportDefaultSpecifier, ImportNamespaceSpecifier, ImportSpecifier, LabeledStatement, Literal, LogicalExpression, MemberExpression, MetaProperty, MethodDefinition, NewExpression, ObjectExpression, ObjectPattern, Program, Property, RestElement, ReturnStatement, SequenceExpression, SpreadElement, Super, SwitchCase, SwitchStatement, TaggedTemplateExpression, TemplateElement, TemplateLiteral, ThisExpression, ThrowStatement, TryStatement, UnaryExpression, UpdateExpression, VariableDeclaration, VariableDeclarator, WhileStatement, WithStatement, YieldExpression, TSEnumDeclaration, BindingName, TSAsExpression, TSClassImplements, TSInterfaceDeclaration, TSTypeAssertion, TSModuleDeclaration, TSModuleBlock, TSDeclareFunction, TSAbstractMethodDefinition, TSInterfaceBody, TSMethodSignature, TSParenthesizedType, TSTypeAnnotation, TSTypeParameterInstantiation, TSTypeReference, TSVoidKeyword, BaseNode } from '@typescript-eslint/types/dist/ts-estree';
 import { AST_NODE_TYPES } from '@typescript-eslint/typescript-estree';
-import { As2TsOption } from '../../typings';
+import { As2TsOption, FromModule } from '../../typings';
 import util = require('util');
 import path = require('path');
 import {TsAnalysor, ClassInfo, FunctionInfo, PropertyInfo} from './TsAnalysor';
@@ -21,6 +21,9 @@ export class TsMaker {
     private readonly noSemecolonTypes = [AST_NODE_TYPES.WhileStatement, AST_NODE_TYPES.DoWhileStatement, AST_NODE_TYPES.ForInStatement, AST_NODE_TYPES.ForOfStatement, 
         AST_NODE_TYPES.ForStatement, AST_NODE_TYPES.IfStatement, AST_NODE_TYPES.SwitchStatement];
 
+    private inputFolder: string;
+    private filePath: string;
+    private dirname: string;
     private relativePath: string;
     private crtClass: ClassInfo;
     private crtFunc: FunctionInfo;
@@ -150,10 +153,13 @@ export class TsMaker {
         return ast.__calPriority;
     }
 
-    make(ast: any, relativePath: string): string {
+    make(ast: any, inputFolder: string, filePath: string): string {
         this.allTypes = [];
         this.importedMap = {};
-        this.relativePath = relativePath;
+        this.inputFolder = inputFolder;
+        this.filePath = filePath;
+        this.dirname = path.dirname(filePath);
+        this.relativePath = path.relative(inputFolder, filePath);
         let str = this.codeFromAST(ast);
 
         let importStr = '';
@@ -162,11 +168,16 @@ export class TsMaker {
             if(!this.importedMap[type] && !this.isSimpleType(type)) {
                 let classInfo = this.analysor.classMap[type];
                 if(classInfo) {
-                    let mstr = classInfo.module.replace(/\//g, '.');
-                    if(mstr.charAt(mstr.length - 1) != '.') {
-                        mstr += '.';
+                    if(this.option.noModule) {
+                        let mstr = path.relative(this.dirname, path.join(inputFolder, classInfo.module));
+                        importStr += 'import {' + type + '} from "' + mstr + '/' + type + '";\n';
+                    } else {
+                        let mstr = classInfo.module.replace(/\//g, '.');
+                        if(mstr.charAt(mstr.length - 1) != '.') {
+                            mstr += '.';
+                        }
+                        importStr += 'import ' + type + ' = ' + mstr + type + ';\n';
                     }
-                    importStr += 'import ' + type + ' = ' + mstr + type + ';\n';
                 }                
             }
         }
@@ -1045,36 +1056,46 @@ export class TsMaker {
             cnt++;
         }
         if(cnt == 0) return '';
+
         let sourceStr: string;
         let sourceValue = ast.source.value as string;
+        let asModuleFormular: FromModule;
         if(this.option.importRule && this.option.importRule.fromModule) {
+            // 需要以模块形式导入
             for(let fm of this.option.importRule.fromModule) {
                 if(new RegExp(fm.regular).test(sourceValue)) {
-                    let idStr = sourceValue.substr(sourceValue.lastIndexOf('/') + 1);
-                    if(this.option.idReplacement && typeof(this.option.idReplacement[idStr]) === 'string') {
-                        idStr = this.option.idReplacement[idStr];
-                    }
-                    sourceStr = ' = ' + fm.module + '.' + idStr;
+                    asModuleFormular = fm;
                     break;
                 }
             }
         }
-        if(!sourceStr) {
-            // specifierStr = '{' + specifierStr + '}';
-            // sourceStr = ' from ' + this.codeFromAST(ast.source);
-            let mstr = sourceValue.replace(/\//g, '.');
-            let dotPos = mstr.lastIndexOf('.');
+        if(asModuleFormular) {            
+            let idStr = sourceValue.substr(sourceValue.lastIndexOf('/') + 1);
+            if(this.option.idReplacement && typeof(this.option.idReplacement[idStr]) === 'string') {
+                idStr = this.option.idReplacement[idStr];
+            }
+            sourceStr = ' = ' + asModuleFormular.module + '.' + idStr;
+            str += specifierStr + sourceStr + ';';
+        } else {
+            let dotPos = sourceValue.lastIndexOf('\/');
             if(dotPos > 0) {
-                let idStr = mstr.substr(dotPos + 1);
+                let idStr = sourceValue.substr(dotPos + 1);
                 if(this.option.idReplacement && typeof(this.option.idReplacement[idStr]) === 'string') {
                     idStr = this.option.idReplacement[idStr];
-                    let preIdStr = mstr.substring(0, dotPos);
-                    mstr = preIdStr + '.' + idStr;
+                    let preIdStr = sourceValue.substring(0, dotPos);
+                    sourceValue = preIdStr + '\/' + idStr;
                 }
             }
-            sourceStr = ' = ' + mstr;
+            if(this.option.noModule) {
+                str += '{' + specifierStr + '} from "' + path.relative(this.dirname, path.join(this.inputFolder, sourceValue)).replace(/\\/g, '/') + '";';
+            } else {
+                // specifierStr = '{' + specifierStr + '}';
+                // sourceStr = ' from ' + this.codeFromAST(ast.source);
+                sourceStr = ' = ' + sourceValue.replace(/\//g, '.');
+                str += specifierStr + sourceStr + ';';
+            }
         }
-        str += specifierStr + sourceStr + ';';
+        
         return str;
     }
 
@@ -1523,7 +1544,7 @@ export class TsMaker {
         let idStr = this.codeFromAST(ast.id);
         (ast.body as any).__parent = ast;
         let bodyStr = this.codeFromAST(ast.body);
-        if(idStr != '_EMPTYMODULE_') {
+        if(!this.option.noModule && idStr != '_EMPTYMODULE_') {
             str += idStr;
             if((ast.body as any).type != AST_NODE_TYPES.TSModuleDeclaration) {
                 str += ' {\n';

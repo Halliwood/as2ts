@@ -3,6 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.TsMaker = void 0;
 var typescript_estree_1 = require("@typescript-eslint/typescript-estree");
 var util = require("util");
+var path = require("path");
 var Strings_1 = require("./Strings");
 var TsMaker = /** @class */ (function () {
     function TsMaker(analysor, option) {
@@ -121,10 +122,13 @@ var TsMaker = /** @class */ (function () {
         }
         return ast.__calPriority;
     };
-    TsMaker.prototype.make = function (ast, relativePath) {
+    TsMaker.prototype.make = function (ast, inputFolder, filePath) {
         this.allTypes = [];
         this.importedMap = {};
-        this.relativePath = relativePath;
+        this.inputFolder = inputFolder;
+        this.filePath = filePath;
+        this.dirname = path.dirname(filePath);
+        this.relativePath = path.relative(inputFolder, filePath);
         var str = this.codeFromAST(ast);
         var importStr = '';
         for (var i = 0, len = this.allTypes.length; i < len; i++) {
@@ -132,11 +136,17 @@ var TsMaker = /** @class */ (function () {
             if (!this.importedMap[type] && !this.isSimpleType(type)) {
                 var classInfo = this.analysor.classMap[type];
                 if (classInfo) {
-                    var mstr = classInfo.module.replace(/\//g, '.');
-                    if (mstr.charAt(mstr.length - 1) != '.') {
-                        mstr += '.';
+                    if (this.option.noModule) {
+                        var mstr = path.relative(this.dirname, path.join(inputFolder, classInfo.module));
+                        importStr += 'import {' + type + '} from "' + mstr + '/' + type + '";\n';
                     }
-                    importStr += 'import ' + type + ' = ' + mstr + type + ';\n';
+                    else {
+                        var mstr = classInfo.module.replace(/\//g, '.');
+                        if (mstr.charAt(mstr.length - 1) != '.') {
+                            mstr += '.';
+                        }
+                        importStr += 'import ' + type + ' = ' + mstr + type + ';\n';
+                    }
                 }
             }
         }
@@ -896,35 +906,45 @@ var TsMaker = /** @class */ (function () {
             return '';
         var sourceStr;
         var sourceValue = ast.source.value;
+        var asModuleFormular;
         if (this.option.importRule && this.option.importRule.fromModule) {
+            // 需要以模块形式导入
             for (var _i = 0, _a = this.option.importRule.fromModule; _i < _a.length; _i++) {
                 var fm = _a[_i];
                 if (new RegExp(fm.regular).test(sourceValue)) {
-                    var idStr = sourceValue.substr(sourceValue.lastIndexOf('/') + 1);
-                    if (this.option.idReplacement && typeof (this.option.idReplacement[idStr]) === 'string') {
-                        idStr = this.option.idReplacement[idStr];
-                    }
-                    sourceStr = ' = ' + fm.module + '.' + idStr;
+                    asModuleFormular = fm;
                     break;
                 }
             }
         }
-        if (!sourceStr) {
-            // specifierStr = '{' + specifierStr + '}';
-            // sourceStr = ' from ' + this.codeFromAST(ast.source);
-            var mstr = sourceValue.replace(/\//g, '.');
-            var dotPos = mstr.lastIndexOf('.');
+        if (asModuleFormular) {
+            var idStr = sourceValue.substr(sourceValue.lastIndexOf('/') + 1);
+            if (this.option.idReplacement && typeof (this.option.idReplacement[idStr]) === 'string') {
+                idStr = this.option.idReplacement[idStr];
+            }
+            sourceStr = ' = ' + asModuleFormular.module + '.' + idStr;
+            str += specifierStr + sourceStr + ';';
+        }
+        else {
+            var dotPos = sourceValue.lastIndexOf('\/');
             if (dotPos > 0) {
-                var idStr = mstr.substr(dotPos + 1);
+                var idStr = sourceValue.substr(dotPos + 1);
                 if (this.option.idReplacement && typeof (this.option.idReplacement[idStr]) === 'string') {
                     idStr = this.option.idReplacement[idStr];
-                    var preIdStr = mstr.substring(0, dotPos);
-                    mstr = preIdStr + '.' + idStr;
+                    var preIdStr = sourceValue.substring(0, dotPos);
+                    sourceValue = preIdStr + '\/' + idStr;
                 }
             }
-            sourceStr = ' = ' + mstr;
+            if (this.option.noModule) {
+                str += '{' + specifierStr + '} from "' + path.relative(this.dirname, path.join(this.inputFolder, sourceValue)).replace(/\\/g, '/') + '";';
+            }
+            else {
+                // specifierStr = '{' + specifierStr + '}';
+                // sourceStr = ' from ' + this.codeFromAST(ast.source);
+                sourceStr = ' = ' + sourceValue.replace(/\//g, '.');
+                str += specifierStr + sourceStr + ';';
+            }
         }
-        str += specifierStr + sourceStr + ';';
         return str;
     };
     TsMaker.prototype.codeFromImportDefaultSpecifier = function (ast) {
@@ -1333,7 +1353,7 @@ var TsMaker = /** @class */ (function () {
         var idStr = this.codeFromAST(ast.id);
         ast.body.__parent = ast;
         var bodyStr = this.codeFromAST(ast.body);
-        if (idStr != '_EMPTYMODULE_') {
+        if (!this.option.noModule && idStr != '_EMPTYMODULE_') {
             str += idStr;
             if (ast.body.type != typescript_estree_1.AST_NODE_TYPES.TSModuleDeclaration) {
                 str += ' {\n';

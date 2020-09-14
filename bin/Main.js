@@ -192,7 +192,7 @@ var Main = /** @class */ (function () {
             var tsFilePath = outFilePath.replace(/\.as$/, '.ts');
             console.log('\x1B[1A\x1B[Kmaking: %s', tsFilePath);
             var astContent = fs.readFileSync(tmpAstPath, 'utf-8');
-            var tsContent = this.tsMaker.make(JSON.parse(astContent), relativePath);
+            var tsContent = this.tsMaker.make(JSON.parse(astContent), this.inputFolder, filePath);
             var outFilePP = path.parse(outFilePath);
             if (!fs.existsSync(outFilePP.dir))
                 fs.mkdirSync(outFilePP.dir, { recursive: true });

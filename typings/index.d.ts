@@ -1,11 +1,13 @@
+export interface FromModule {
+    /**导出的模块名 */
+    "module": string, 
+    /**匹配规则，支持正则表达式匹配 */
+    "regular": string
+}
+
 export interface As2TsImportRule {
     /**需要导出为模块的规则 */
-    "fromModule"?: {
-        /**导出的模块名 */
-        "module": string, 
-        /**匹配规则，支持正则表达式匹配 */
-        "regular": string
-    }[]
+    "fromModule"?: FromModule[]
 }
 
 export interface As2TsSkipRule {
@@ -26,6 +28,8 @@ export interface As2TsOption {
     typeMapper?: {[key: string]: string}, 
     /**方法替换映射规则，不支持正则表达式匹配 */
     methordMapper?: {[key: string]: string}, 
+    /**是否不生成模块 */
+    noModule?: boolean, 
     /**模块导入规则 */
     importRule?: As2TsImportRule, 
     /**额外的typescript代码库，用于补充类库信息 */

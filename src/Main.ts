@@ -189,7 +189,7 @@ export default class Main {
             let tsFilePath = outFilePath.replace(/\.as$/, '.ts');
             console.log('\x1B[1A\x1B[Kmaking: %s', tsFilePath);    
             let astContent = fs.readFileSync(tmpAstPath, 'utf-8');
-            let tsContent = this.tsMaker.make(JSON.parse(astContent), relativePath);
+            let tsContent = this.tsMaker.make(JSON.parse(astContent), this.inputFolder, filePath);
             let outFilePP = path.parse(outFilePath);
             if (!fs.existsSync(outFilePP.dir)) fs.mkdirSync(outFilePP.dir, { recursive: true });
             fs.writeFileSync(tsFilePath, tsContent);
