@@ -685,6 +685,7 @@ export class TsMaker {
 
     private codeFromCatchClause(ast: CatchClause): string {
         let str = 'catch(';
+        (ast.param as any).__parent = ast;
         str += this.codeFromAST(ast.param);
         str += ') {\n'
         str += this.indent(this.codeFromBlockStatement(ast.body));
@@ -997,7 +998,7 @@ export class TsMaker {
             }
         }
         if(ast.typeAnnotation) {
-            if(!(ast as any).__parent || !(ast as any).__parent.__parent || !(ast as any).__parent.__parent.__parent || AST_NODE_TYPES.ForInStatement != (ast as any).__parent.__parent.__parent.type) {
+            if(!(ast as any).__parent || ((ast as any).__parent.type != AST_NODE_TYPES.CatchClause && (!(ast as any).__parent.__parent || !(ast as any).__parent.__parent.__parent || AST_NODE_TYPES.ForInStatement != (ast as any).__parent.__parent.__parent.type))) {
                 str += ': ' + this.codeFromAST(ast.typeAnnotation);
             }
         } else if((ast as any).__isType) {
@@ -1342,7 +1343,7 @@ export class TsMaker {
     private codeFromUnaryExpression(ast: UnaryExpression): string {
         let str;
         let agm = this.codeFromAST(ast.argument);
-        if (this.calPriority(ast.argument) >= this.calPriority(ast)) {
+        if (ast.operator == 'typeof' || this.calPriority(ast.argument) >= this.calPriority(ast)) {
             agm = '(' + agm + ')';
         }
         if (ast.prefix) {

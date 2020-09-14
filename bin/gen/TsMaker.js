@@ -553,6 +553,7 @@ var TsMaker = /** @class */ (function () {
     };
     TsMaker.prototype.codeFromCatchClause = function (ast) {
         var str = 'catch(';
+        ast.param.__parent = ast;
         str += this.codeFromAST(ast.param);
         str += ') {\n';
         str += this.indent(this.codeFromBlockStatement(ast.body));
@@ -843,7 +844,7 @@ var TsMaker = /** @class */ (function () {
             }
         }
         if (ast.typeAnnotation) {
-            if (!ast.__parent || !ast.__parent.__parent || !ast.__parent.__parent.__parent || typescript_estree_1.AST_NODE_TYPES.ForInStatement != ast.__parent.__parent.__parent.type) {
+            if (!ast.__parent || (ast.__parent.type != typescript_estree_1.AST_NODE_TYPES.CatchClause && (!ast.__parent.__parent || !ast.__parent.__parent.__parent || typescript_estree_1.AST_NODE_TYPES.ForInStatement != ast.__parent.__parent.__parent.type))) {
                 str += ': ' + this.codeFromAST(ast.typeAnnotation);
             }
         }
@@ -1164,7 +1165,7 @@ var TsMaker = /** @class */ (function () {
     TsMaker.prototype.codeFromUnaryExpression = function (ast) {
         var str;
         var agm = this.codeFromAST(ast.argument);
-        if (this.calPriority(ast.argument) >= this.calPriority(ast)) {
+        if (ast.operator == 'typeof' || this.calPriority(ast.argument) >= this.calPriority(ast)) {
             agm = '(' + agm + ')';
         }
         if (ast.prefix) {

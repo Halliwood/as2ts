@@ -59,7 +59,7 @@ export class AsTranslator {
 
         // is改instanceof
         asContent = asContent.replace(/if\s?\((.+)\s+is\s+(\S+)\)/g, 'if($1 instanceof $2)');
-        asContent = asContent.replace(/=\s*(.+)\s+is\s+/g, '= $1 instanceof $2');
+        asContent = asContent.replace(/=\s*(.+)\s+is\s+/g, '= $1 instanceof ');
 
         // Vector.<xxx>改Array<xxx>
         asContent = asContent.replace(/Vector\.(?=<)/g, 'Array');

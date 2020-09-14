@@ -1,7 +1,7 @@
 {
     "skipRule": {
         "dirs": ["^\bui\b", "^automatic"], 
-        "files": ["MsgPool.as", "FyMsg.as", "DecodeUtil.as", "EncodeUtil.as", "SendMsgUtil.as"]
+        "files": ["FyMsg.as", "DecodeUtil.as", "EncodeUtil.as", "SendMsgUtil.as"]
     }, 
     "idReplacement": {
         "KW": "KeyWord"

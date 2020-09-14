@@ -216,4 +216,7 @@ ISC
 
 ## 作者
 
-[Github](https://github.com/Halliwood/) | [npm](https://www.npmjs.com/~taiyosen) | [QQ](501251659@qq.com)
+[Github](https://github.com/Halliwood/) | [npm](https://www.npmjs.com/~taiyosen) | [QQ](http://wpa.qq.com/msgrd?v=3&uin=501251659&site=qq&menu=yes)
+
+## 捐助作者帮他改善
+![donate](bin/donate.jpg)
