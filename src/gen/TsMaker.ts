@@ -193,7 +193,7 @@ export class TsMaker {
         str = str.replace(this.TagAddImport, importStr);
         str = str.replace(new RegExp('import \\{\\w+\\} from "' + path.basename(this.filePath, '.ts') + '";'), '');
         let fileBasename = path.basename(this.filePath, '.as');
-        str = str.replace('import \{' + fileBasename + '\} from "' + fileBasename + '";', '');
+        str = str.replace('import \{' + fileBasename + '\} from "./' + fileBasename + '";', '');
         return str;
     }
 
@@ -677,6 +677,8 @@ export class TsMaker {
     }
 
     private codeFromCallExpression(ast: CallExpression): string {
+        // 没有基类的去掉super
+        if(ast.callee.type == AST_NODE_TYPES.Super && this.crtClass && !this.crtClass.superClass) return '';
         (ast.callee as any).__parent = ast;
         let calleeStr = this.codeFromAST(ast.callee);
         if(this.option.methordMapper && this.option.methordMapper[calleeStr]) {
@@ -1361,6 +1363,7 @@ export class TsMaker {
 
     private codeFromTSClassImplements(ast: TSClassImplements): string {
         let str = '';
+        (ast.expression as any).__isType = true;
         str += this.codeFromAST(ast.expression);
         if(ast.typeParameters) {
             str += '<' + this.codeFromAST(ast.typeParameters) + '>';

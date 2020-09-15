@@ -162,7 +162,7 @@ var TsMaker = /** @class */ (function () {
         str = str.replace(this.TagAddImport, importStr);
         str = str.replace(new RegExp('import \\{\\w+\\} from "' + path.basename(this.filePath, '.ts') + '";'), '');
         var fileBasename = path.basename(this.filePath, '.as');
-        str = str.replace('import \{' + fileBasename + '\} from "' + fileBasename + '";', '');
+        str = str.replace('import \{' + fileBasename + '\} from "./' + fileBasename + '";', '');
         return str;
     };
     // private processAST(ast: any) {
@@ -544,6 +544,9 @@ var TsMaker = /** @class */ (function () {
         return 'break;';
     };
     TsMaker.prototype.codeFromCallExpression = function (ast) {
+        // 没有基类的去掉super
+        if (ast.callee.type == typescript_estree_1.AST_NODE_TYPES.Super && this.crtClass && !this.crtClass.superClass)
+            return '';
         ast.callee.__parent = ast;
         var calleeStr = this.codeFromAST(ast.callee);
         if (this.option.methordMapper && this.option.methordMapper[calleeStr]) {
@@ -1185,6 +1188,7 @@ var TsMaker = /** @class */ (function () {
     };
     TsMaker.prototype.codeFromTSClassImplements = function (ast) {
         var str = '';
+        ast.expression.__isType = true;
         str += this.codeFromAST(ast.expression);
         if (ast.typeParameters) {
             str += '<' + this.codeFromAST(ast.typeParameters) + '>';

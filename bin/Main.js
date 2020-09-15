@@ -147,7 +147,8 @@ var Main = /** @class */ (function () {
         }
     };
     Main.prototype.doTranslateFile = function (filePath, phase) {
-        // if(filePath.indexOf('JsonDataLoader.as')<0) return;
+        if (filePath.indexOf('ItemWithName.as') < 0)
+            return;
         var relativePath = path.relative(this.inputFolder, filePath);
         if (this.transOption.skipRule && this.transOption.skipRule.files) {
             for (var _i = 0, _a = this.transOption.skipRule.files; _i < _a.length; _i++) {
