@@ -64,6 +64,8 @@ export interface As2TsOption {
     typeMapper?: {[key: string]: string}, 
     /**方法替换映射规则，不支持正则表达式匹配 */
     methordMapper?: {[key: string]: string}, 
+    /**是否不生成模块 */
+    noModule?: boolean, 
     /**模块导入规则 */
     importRule?: As2TsImportRule, 
     /**额外的typescript代码库，用于补充类库信息 */
@@ -147,6 +149,72 @@ export interface As2TsSkipRule {
 }
 ```
 
+#### noModule
+  默认情况下，as2ts-smart会将AS3中的`package xxx`翻译为`module xxx`，相应的，所有的`import a.b.C;`将会翻译为`import C = a.b.C;`。启用此项后，将去掉模块的声明。比如如下两个AS3类：
+
+```ActionScript 3.0
+// file a/B.as
+package a {
+    public class B
+    {
+        //...
+    }
+}
+```
+
+```ActionScript 3.0
+// file a/b/C.as
+package a.b {
+    import a.B;
+    public class C extends B
+    {
+        //...
+    }
+}
+```
+
+默认情况下，将分别翻译为
+
+```TypeScript
+// file a/B.ts
+module a {
+    expport class B
+    {
+        //...
+    }
+}
+```
+
+```TypeScript
+// file a/b/C.ts
+module a.b {
+    import B = a.B;
+    export class C extends B
+    {
+        //...
+    }
+}
+```
+
+  当`noModule`选项设置为`true`时，则翻译为
+  
+```TypeScript
+// file a/B.ts
+expport class B
+{
+    //...
+}
+```
+
+```TypeScript
+// file a/b/C.ts
+import {B} from '../B';
+export class C extends B
+{
+    //...
+}
+```
+
 #### importRule
   此项用于将AS的包按照指定的规则转换为TS的模块，其格式定义如下，请参见[As2TsImportRule](./typings/index.d.ts)。
   
@@ -218,5 +286,5 @@ ISC
 
 [Github](https://github.com/Halliwood/) | [npm](https://www.npmjs.com/~taiyosen) | [QQ](http://wpa.qq.com/msgrd?v=3&uin=501251659&site=qq&menu=yes)
 
-## 捐助作者帮他改善
+## 鼓励作者继续改善
 [1元助力](http://jd.res.fygame.com/testurl/jwcKorea/assets/android/donate.jpg)

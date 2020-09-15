@@ -137,7 +137,10 @@ var TsMaker = /** @class */ (function () {
                 var classInfo = this.analysor.classMap[type];
                 if (classInfo) {
                     if (this.option.noModule) {
-                        var mstr = path.relative(this.dirname, path.join(inputFolder, classInfo.module));
+                        var mstr = path.relative(this.dirname, path.join(inputFolder, classInfo.module.replace(/\.+/g, path.sep))).replace(/\\+/g, '/');
+                        if (!mstr) {
+                            mstr = '.';
+                        }
                         importStr += 'import {' + type + '} from "' + mstr + '/' + type + '";\n';
                     }
                     else {
@@ -150,10 +153,13 @@ var TsMaker = /** @class */ (function () {
                 }
             }
         }
-        if (importStr) {
+        if (importStr && !this.option.noModule) {
             importStr = this.indent(importStr);
         }
         str = str.replace(this.TagAddImport, importStr);
+        str = str.replace(new RegExp('import \\{\\w+\\} from "' + path.basename(this.filePath, '.ts') + '";'), '');
+        var fileBasename = path.basename(this.filePath, '.as');
+        str = str.replace('import \{' + fileBasename + '\} from "' + fileBasename + '";', '');
         return str;
     };
     // private processAST(ast: any) {
@@ -832,7 +838,7 @@ var TsMaker = /** @class */ (function () {
             if (ast.__parent && ast.__parent.type == typescript_estree_1.AST_NODE_TYPES.VariableDeclarator) {
                 this.crtFunc.localVars.push(str);
             }
-            else if ((!ast.__parent || this.parentNoThis.indexOf(ast.__parent.type) < 0 && (ast.__parent.type != typescript_estree_1.AST_NODE_TYPES.MemberExpression || ast.__parent.computed)) &&
+            else if (str != this.crtClass.name && (!ast.__parent || this.parentNoThis.indexOf(ast.__parent.type) < 0 && (ast.__parent.type != typescript_estree_1.AST_NODE_TYPES.MemberExpression || ast.__memberExp_is_object)) &&
                 this.crtFunc.params.indexOf(str) < 0 && this.crtFunc.localVars.indexOf(str) < 0) {
                 var minfo = this.getMemberInfo(this.crtClass, str);
                 if (minfo) {
@@ -917,26 +923,28 @@ var TsMaker = /** @class */ (function () {
                 }
             }
         }
-        if (asModuleFormular) {
-            var idStr = sourceValue.substr(sourceValue.lastIndexOf('/') + 1);
-            if (this.option.idReplacement && typeof (this.option.idReplacement[idStr]) === 'string') {
-                idStr = this.option.idReplacement[idStr];
+        var dotPos = sourceValue.lastIndexOf('/');
+        var idStr = sourceValue;
+        if (dotPos > 0) {
+            idStr = sourceValue.substr(dotPos + 1);
+        }
+        if (this.option.idReplacement && typeof (this.option.idReplacement[idStr]) === 'string') {
+            idStr = this.option.idReplacement[idStr];
+            if (dotPos > 0) {
+                var preIdStr = sourceValue.substring(0, dotPos);
+                sourceValue = preIdStr + '/' + idStr;
             }
+        }
+        if (asModuleFormular) {
             sourceStr = ' = ' + asModuleFormular.module + '.' + idStr;
             str += specifierStr + sourceStr + ';';
         }
         else {
-            var dotPos = sourceValue.lastIndexOf('\/');
-            if (dotPos > 0) {
-                var idStr = sourceValue.substr(dotPos + 1);
-                if (this.option.idReplacement && typeof (this.option.idReplacement[idStr]) === 'string') {
-                    idStr = this.option.idReplacement[idStr];
-                    var preIdStr = sourceValue.substring(0, dotPos);
-                    sourceValue = preIdStr + '\/' + idStr;
-                }
-            }
             if (this.option.noModule) {
-                str += '{' + specifierStr + '} from "' + path.relative(this.dirname, path.join(this.inputFolder, sourceValue)).replace(/\\/g, '/') + '";';
+                var rp = path.relative(this.dirname, path.join(this.inputFolder, sourceValue)).replace(/\\/g, '/');
+                if (rp.indexOf('/') < 0)
+                    rp = './' + rp;
+                str += '{' + specifierStr + '} from "' + rp + '";';
             }
             else {
                 // specifierStr = '{' + specifierStr + '}';
@@ -987,7 +995,8 @@ var TsMaker = /** @class */ (function () {
         return str;
     };
     TsMaker.prototype.codeFromMemberExpression = function (ast) {
-        ast.property.__parent = ast;
+        ast.object.__memberExp_is_object = true;
+        ast.object.__parent = ast;
         // if(ast.object.type == AST_NODE_TYPES.Identifier) {
         //     (ast.object as any).__addThis = true;
         // }
@@ -1367,6 +1376,9 @@ var TsMaker = /** @class */ (function () {
         }
         else {
             str = bodyStr;
+            if (ast.body.type != typescript_estree_1.AST_NODE_TYPES.TSModuleDeclaration) {
+                str = this.TagAddImport + str;
+            }
         }
         return str;
     };

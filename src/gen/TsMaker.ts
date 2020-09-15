@@ -169,7 +169,10 @@ export class TsMaker {
                 let classInfo = this.analysor.classMap[type];
                 if(classInfo) {
                     if(this.option.noModule) {
-                        let mstr = path.relative(this.dirname, path.join(inputFolder, classInfo.module));
+                        let mstr = path.relative(this.dirname, path.join(inputFolder, classInfo.module.replace(/\.+/g, path.sep))).replace(/\\+/g, '/');
+                        if(!mstr) {
+                            mstr = '.';
+                        }
                         importStr += 'import {' + type + '} from "' + mstr + '/' + type + '";\n';
                     } else {
                         let mstr = classInfo.module.replace(/\//g, '.');
@@ -178,13 +181,16 @@ export class TsMaker {
                         }
                         importStr += 'import ' + type + ' = ' + mstr + type + ';\n';
                     }
-                }                
-            }
+                }              
+            } 
         }
-        if(importStr) {
+        if(importStr && !this.option.noModule) {
             importStr = this.indent(importStr);
         }
         str = str.replace(this.TagAddImport, importStr);
+        str = str.replace(new RegExp('import \\{\\w+\\} from "' + path.basename(this.filePath, '.ts') + '";'), '');
+        let fileBasename = path.basename(this.filePath, '.as');
+        str = str.replace('import \{' + fileBasename + '\} from "' + fileBasename + '";', '');
         return str;
     }
 
@@ -990,7 +996,7 @@ export class TsMaker {
             if((ast as any).__parent && (ast as any).__parent.type == AST_NODE_TYPES.VariableDeclarator) { 
                 this.crtFunc.localVars.push(str);
             }
-            else if((!(ast as any).__parent || this.parentNoThis.indexOf((ast as any).__parent.type) < 0 && ((ast as any).__parent.type != AST_NODE_TYPES.MemberExpression || ((ast as any).__parent as MemberExpression).computed)) && 
+            else if(str != this.crtClass.name && (!(ast as any).__parent || this.parentNoThis.indexOf((ast as any).__parent.type) < 0 && ((ast as any).__parent.type != AST_NODE_TYPES.MemberExpression || (ast as any).__memberExp_is_object)) && 
             this.crtFunc.params.indexOf(str) < 0 && this.crtFunc.localVars.indexOf(str) < 0) {
                 let minfo = this.getMemberInfo(this.crtClass, str);
                 if(minfo) {
@@ -1005,7 +1011,7 @@ export class TsMaker {
                     if(this.allTypes.indexOf(str) < 0) {
                         this.allTypes.push(str);
                     }
-                }
+                } 
             }
         }
         if(ast.typeAnnotation) {
@@ -1069,25 +1075,26 @@ export class TsMaker {
                 }
             }
         }
-        if(asModuleFormular) {            
-            let idStr = sourceValue.substr(sourceValue.lastIndexOf('/') + 1);
-            if(this.option.idReplacement && typeof(this.option.idReplacement[idStr]) === 'string') {
-                idStr = this.option.idReplacement[idStr];
+        let dotPos = sourceValue.lastIndexOf('/');
+        let idStr = sourceValue;
+        if(dotPos > 0) {
+            idStr = sourceValue.substr(dotPos + 1);
+        }
+        if(this.option.idReplacement && typeof(this.option.idReplacement[idStr]) === 'string') {
+            idStr = this.option.idReplacement[idStr];
+            if(dotPos > 0) {
+                let preIdStr = sourceValue.substring(0, dotPos);
+                sourceValue = preIdStr + '/' + idStr;
             }
+        }
+        if(asModuleFormular) {
             sourceStr = ' = ' + asModuleFormular.module + '.' + idStr;
             str += specifierStr + sourceStr + ';';
         } else {
-            let dotPos = sourceValue.lastIndexOf('\/');
-            if(dotPos > 0) {
-                let idStr = sourceValue.substr(dotPos + 1);
-                if(this.option.idReplacement && typeof(this.option.idReplacement[idStr]) === 'string') {
-                    idStr = this.option.idReplacement[idStr];
-                    let preIdStr = sourceValue.substring(0, dotPos);
-                    sourceValue = preIdStr + '\/' + idStr;
-                }
-            }
             if(this.option.noModule) {
-                str += '{' + specifierStr + '} from "' + path.relative(this.dirname, path.join(this.inputFolder, sourceValue)).replace(/\\/g, '/') + '";';
+                let rp = path.relative(this.dirname, path.join(this.inputFolder, sourceValue)).replace(/\\/g, '/');
+                if(rp.indexOf('/') < 0) rp = './' + rp;
+                str += '{' + specifierStr + '} from "' + rp + '";';
             } else {
                 // specifierStr = '{' + specifierStr + '}';
                 // sourceStr = ' from ' + this.codeFromAST(ast.source);
@@ -1145,7 +1152,8 @@ export class TsMaker {
     }
 
     private codeFromMemberExpression(ast: MemberExpression): string {
-        (ast.property as any).__parent = ast;
+        (ast.object as any).__memberExp_is_object = true;
+        (ast.object as any).__parent = ast;
         // if(ast.object.type == AST_NODE_TYPES.Identifier) {
         //     (ast.object as any).__addThis = true;
         // }
@@ -1556,6 +1564,9 @@ export class TsMaker {
             }
         } else {
             str = bodyStr;
+            if((ast.body as any).type != AST_NODE_TYPES.TSModuleDeclaration) {
+                str = this.TagAddImport + str;
+            } 
         }
         return str;
     }
