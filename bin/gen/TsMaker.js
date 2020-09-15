@@ -141,6 +141,9 @@ var TsMaker = /** @class */ (function () {
                         if (!mstr) {
                             mstr = '.';
                         }
+                        else if (mstr.charAt(0) != '.') {
+                            mstr = './' + mstr;
+                        }
                         importStr += 'import {' + type + '} from "' + mstr + '/' + type + '";\n';
                     }
                     else {
@@ -942,7 +945,7 @@ var TsMaker = /** @class */ (function () {
         else {
             if (this.option.noModule) {
                 var rp = path.relative(this.dirname, path.join(this.inputFolder, sourceValue)).replace(/\\/g, '/');
-                if (rp.indexOf('/') < 0)
+                if (rp.charAt(0) != '.')
                     rp = './' + rp;
                 str += '{' + specifierStr + '} from "' + rp + '";';
             }

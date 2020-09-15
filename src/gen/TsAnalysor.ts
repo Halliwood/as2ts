@@ -86,76 +86,83 @@ export class TsAnalysor {
     }
 
     private processAST(ast: any) {
-        let str = '';
         switch (ast.type) {
+            case AST_NODE_TYPES.AssignmentPattern:
+                this.processAssignmentPattern(ast);
+                break;
 
             case AST_NODE_TYPES.BlockStatement:
-                str += this.processBlockStatement(ast);
+                this.processBlockStatement(ast);
                 break;
 
             case AST_NODE_TYPES.ClassBody:
-                str += this.processClassBody(ast);
+                this.processClassBody(ast);
                 break;
 
             case AST_NODE_TYPES.ClassDeclaration:
-                str += this.processClassDeclaration(ast);
+                this.processClassDeclaration(ast);
                 break;
 
             case AST_NODE_TYPES.ClassExpression:
-                str += this.processClassExpression(ast);
+                this.processClassExpression(ast);
                 break;
 
             case AST_NODE_TYPES.ClassProperty:
-                str += this.processClassProperty(ast);
+                this.processClassProperty(ast);
                 break;
 
             case AST_NODE_TYPES.ExportNamedDeclaration:
-                str += this.processExportNamedDeclaration(ast);
+                this.processExportNamedDeclaration(ast);
                 break;
 
             case AST_NODE_TYPES.ExpressionStatement:
-                str += this.processExpressionStatement(ast);
+                this.processExpressionStatement(ast);
                 break;
 
             case AST_NODE_TYPES.FunctionDeclaration:
-                str += this.processFunctionDeclaration(ast);
+                this.processFunctionDeclaration(ast);
                 break;
 
             case AST_NODE_TYPES.FunctionExpression:
-                str += this.processFunctionExpression(ast);
+                this.processFunctionExpression(ast);
                 break;
 
             case AST_NODE_TYPES.Identifier:
-                str += this.processIdentifier(ast);
+                this.processIdentifier(ast);
                 break;
 
             case AST_NODE_TYPES.MethodDefinition:
-                str += this.processMethodDefinition(ast);
+                this.processMethodDefinition(ast);
                 break;
 
             case AST_NODE_TYPES.Program:
-                str += this.processProgram(ast);
+                this.processProgram(ast);
                 break;
 
             case AST_NODE_TYPES.TSAbstractMethodDefinition:
-                str += this.processTSAbstractMethodDefinition(ast);
+                this.processTSAbstractMethodDefinition(ast);
                 break;
 
             case AST_NODE_TYPES.TSModuleBlock:
-                str += this.processTSModuleBlock(ast);
+                this.processTSModuleBlock(ast);
                 break;
 
             case AST_NODE_TYPES.TSModuleDeclaration:
-                str += this.processTSModuleDeclaration(ast);
+                this.processTSModuleDeclaration(ast);
                 break;
 
             case AST_NODE_TYPES.TSInterfaceDeclaration:
-                str += this.processTSInterfaceDeclaration(ast);
+                this.processTSInterfaceDeclaration(ast);
                 break;
 
             default:
                 break;
         }
+    }
+
+    private processAssignmentPattern(ast: AssignmentPattern) {
+        if((ast as any).__isFuncParam) (ast.left as any).__isFuncParam = true;
+        this.processAST(ast.left);
     }
 
     private processBlockStatement(ast: BlockStatement) {

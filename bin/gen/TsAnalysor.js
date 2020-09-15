@@ -90,59 +90,66 @@ var TsAnalysor = /** @class */ (function () {
         this.processAST(ast);
     };
     TsAnalysor.prototype.processAST = function (ast) {
-        var str = '';
         switch (ast.type) {
+            case typescript_estree_1.AST_NODE_TYPES.AssignmentPattern:
+                this.processAssignmentPattern(ast);
+                break;
             case typescript_estree_1.AST_NODE_TYPES.BlockStatement:
-                str += this.processBlockStatement(ast);
+                this.processBlockStatement(ast);
                 break;
             case typescript_estree_1.AST_NODE_TYPES.ClassBody:
-                str += this.processClassBody(ast);
+                this.processClassBody(ast);
                 break;
             case typescript_estree_1.AST_NODE_TYPES.ClassDeclaration:
-                str += this.processClassDeclaration(ast);
+                this.processClassDeclaration(ast);
                 break;
             case typescript_estree_1.AST_NODE_TYPES.ClassExpression:
-                str += this.processClassExpression(ast);
+                this.processClassExpression(ast);
                 break;
             case typescript_estree_1.AST_NODE_TYPES.ClassProperty:
-                str += this.processClassProperty(ast);
+                this.processClassProperty(ast);
                 break;
             case typescript_estree_1.AST_NODE_TYPES.ExportNamedDeclaration:
-                str += this.processExportNamedDeclaration(ast);
+                this.processExportNamedDeclaration(ast);
                 break;
             case typescript_estree_1.AST_NODE_TYPES.ExpressionStatement:
-                str += this.processExpressionStatement(ast);
+                this.processExpressionStatement(ast);
                 break;
             case typescript_estree_1.AST_NODE_TYPES.FunctionDeclaration:
-                str += this.processFunctionDeclaration(ast);
+                this.processFunctionDeclaration(ast);
                 break;
             case typescript_estree_1.AST_NODE_TYPES.FunctionExpression:
-                str += this.processFunctionExpression(ast);
+                this.processFunctionExpression(ast);
                 break;
             case typescript_estree_1.AST_NODE_TYPES.Identifier:
-                str += this.processIdentifier(ast);
+                this.processIdentifier(ast);
                 break;
             case typescript_estree_1.AST_NODE_TYPES.MethodDefinition:
-                str += this.processMethodDefinition(ast);
+                this.processMethodDefinition(ast);
                 break;
             case typescript_estree_1.AST_NODE_TYPES.Program:
-                str += this.processProgram(ast);
+                this.processProgram(ast);
                 break;
             case typescript_estree_1.AST_NODE_TYPES.TSAbstractMethodDefinition:
-                str += this.processTSAbstractMethodDefinition(ast);
+                this.processTSAbstractMethodDefinition(ast);
                 break;
             case typescript_estree_1.AST_NODE_TYPES.TSModuleBlock:
-                str += this.processTSModuleBlock(ast);
+                this.processTSModuleBlock(ast);
                 break;
             case typescript_estree_1.AST_NODE_TYPES.TSModuleDeclaration:
-                str += this.processTSModuleDeclaration(ast);
+                this.processTSModuleDeclaration(ast);
                 break;
             case typescript_estree_1.AST_NODE_TYPES.TSInterfaceDeclaration:
-                str += this.processTSInterfaceDeclaration(ast);
+                this.processTSInterfaceDeclaration(ast);
                 break;
             default:
                 break;
         }
+    };
+    TsAnalysor.prototype.processAssignmentPattern = function (ast) {
+        if (ast.__isFuncParam)
+            ast.left.__isFuncParam = true;
+        this.processAST(ast.left);
     };
     TsAnalysor.prototype.processBlockStatement = function (ast) {
         for (var i = 0, len = ast.body.length; i < len; i++) {

@@ -101,7 +101,7 @@ export interface As2TsSkipRule {
 
 ```JSON
 "skipRule": {
-    "dirs": ["^\bui\b", "^\bautomatic\b"], 
+    "dirs": ["^\\bui\\b", "^\bautomatic\b"], 
     "files": ["MsgPool.as", "FyMsg.as", "DecodeUtil.as", "EncodeUtil.as", "SendMsgUtil.as"]
 }
 ```

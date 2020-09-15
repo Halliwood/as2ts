@@ -173,6 +173,9 @@ export class TsMaker {
                         if(!mstr) {
                             mstr = '.';
                         }
+                        else if(mstr.charAt(0) != '.') {
+                            mstr = './' + mstr;
+                        }
                         importStr += 'import {' + type + '} from "' + mstr + '/' + type + '";\n';
                     } else {
                         let mstr = classInfo.module.replace(/\//g, '.');
@@ -1093,7 +1096,7 @@ export class TsMaker {
         } else {
             if(this.option.noModule) {
                 let rp = path.relative(this.dirname, path.join(this.inputFolder, sourceValue)).replace(/\\/g, '/');
-                if(rp.indexOf('/') < 0) rp = './' + rp;
+                if(rp.charAt(0) != '.') rp = './' + rp;
                 str += '{' + specifierStr + '} from "' + rp + '";';
             } else {
                 // specifierStr = '{' + specifierStr + '}';

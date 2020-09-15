@@ -1,6 +1,6 @@
 {
     "skipRule": {
-        "dirs": ["^\bui\b", "^automatic"], 
+        "dirs": ["^\\bui\\b", "^automatic"], 
         "files": ["FyMsg.as", "DecodeUtil.as", "EncodeUtil.as", "SendMsgUtil.as"]
     }, 
     "idReplacement": {
@@ -13,7 +13,8 @@
         "fromModule": [
             {"module": "Protocol", "regular": "^automatic/protocol/(?!Macros|ErrorId)" }, 
             {"module": "GameConfig", "regular": "^automatic/cfgs/(?!ConfigDecoder)" }, 
-            {"module": "Laya", "regular": "^laya/" }
+            {"module": "Laya", "regular": "^laya/" }, 
+            {"module": "ui", "regular": "^ui/" }
         ]
     }, 
     "tsLibs": ["E:/qhgame/tsproj/src/ui/layaUI.max.all.ts"], 
