@@ -17,7 +17,7 @@
             {"module": "ui", "regular": "^ui/" }
         ]
     }, 
-    "tsLibs": ["E:/qhgame/tsproj/src/ui/layaUI.max.all.ts"], 
+    "tsLibs": ["E:/qhgame/tsproj/libs/LayaAir.d.ts", "E:/qhgame/tsproj/src/ui/layaUI.max.all.ts"], 
     "noModule": true, 
     "errorDetail": true, 
     "terminateWhenError": true, 

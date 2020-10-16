@@ -167,7 +167,7 @@ export class TsMaker {
             let type = this.allTypes[i];
             if(!this.importedMap[type] && !this.isSimpleType(type)) {
                 let classInfo = this.analysor.classMap[type];
-                if(classInfo) {
+                if(classInfo && !classInfo.declare) {
                     if(this.option.noModule) {
                         let mstr = path.relative(this.dirname, path.join(inputFolder, classInfo.module.replace(/\.+/g, path.sep))).replace(/\\+/g, '/');
                         if(!mstr) {

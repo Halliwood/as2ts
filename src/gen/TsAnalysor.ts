@@ -37,9 +37,15 @@ export class ClassInfo {
     name: string;
     superClass: string;
     module: string;
+    declare: boolean;
     propertyMap: {[name: string]: PropertyInfo} = {};
     privateProperties: string[] = [];
     functionMap: {[name: string]: FunctionInfo} = {};
+
+    get fullName(): string {
+        if(!this.module) return this.name;
+        return this.module + '.' + this.name;
+    }
 
     toString(): string {
         let str = this.module + '.' + this.name;
@@ -190,9 +196,13 @@ export class TsAnalysor {
         }
         let className = this.codeFromAST(ast.id);
         this.crtClass = new ClassInfo();
+        this.crtClass.declare = ast.declare;
         this.crtClass.name = className;
         this.crtClass.module = this.crtModule || this.module;
         this.classMap[className] = this.crtClass;
+        if(this.crtClass.module) {
+            this.classMap[this.crtClass.fullName] = this.crtClass;
+        }
         if(ast.superClass) this.crtClass.superClass = this.codeFromAST(ast.superClass);
         
         this.processClassBody(ast.body);
@@ -308,6 +318,9 @@ export class TsAnalysor {
         this.crtClass.name = className;
         this.crtClass.module = this.crtModule || this.module;
         this.classMap[className] = this.crtClass;
+        if(this.crtClass.module) {
+            this.classMap[this.crtClass.fullName] = this.crtClass;
+        }
     }
 
     private codeFromAST(ast: any): string {

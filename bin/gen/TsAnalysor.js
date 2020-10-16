@@ -56,6 +56,15 @@ var ClassInfo = /** @class */ (function () {
         this.privateProperties = [];
         this.functionMap = {};
     }
+    Object.defineProperty(ClassInfo.prototype, "fullName", {
+        get: function () {
+            if (!this.module)
+                return this.name;
+            return this.module + '.' + this.name;
+        },
+        enumerable: false,
+        configurable: true
+    });
     ClassInfo.prototype.toString = function () {
         var str = this.module + '.' + this.name;
         for (var propertyName in this.propertyMap) {
@@ -174,9 +183,13 @@ var TsAnalysor = /** @class */ (function () {
         }
         var className = this.codeFromAST(ast.id);
         this.crtClass = new ClassInfo();
+        this.crtClass.declare = ast.declare;
         this.crtClass.name = className;
         this.crtClass.module = this.crtModule || this.module;
         this.classMap[className] = this.crtClass;
+        if (this.crtClass.module) {
+            this.classMap[this.crtClass.fullName] = this.crtClass;
+        }
         if (ast.superClass)
             this.crtClass.superClass = this.codeFromAST(ast.superClass);
         this.processClassBody(ast.body);
@@ -279,6 +292,9 @@ var TsAnalysor = /** @class */ (function () {
         this.crtClass.name = className;
         this.crtClass.module = this.crtModule || this.module;
         this.classMap[className] = this.crtClass;
+        if (this.crtClass.module) {
+            this.classMap[this.crtClass.fullName] = this.crtClass;
+        }
     };
     TsAnalysor.prototype.codeFromAST = function (ast) {
         var str = '';
