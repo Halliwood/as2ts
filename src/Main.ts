@@ -146,7 +146,7 @@ export default class Main {
     }
 
     private doTranslateFile(filePath: string, phase: As2TsPhase) {
-        // if(filePath.indexOf('RootBase.as')<0) return;
+        // if(filePath.indexOf('WanXianPanel.as')<0) return;
         let relativePath = path.relative(this.inputFolder, filePath);
         if(this.transOption.skipRule && this.transOption.skipRule.files) {
             for(let sf of this.transOption.skipRule.files) {

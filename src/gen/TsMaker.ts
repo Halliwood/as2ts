@@ -31,6 +31,7 @@ export class TsMaker {
     private importedMap: {[key: string]: boolean};
     private allTypes: string[];
     private startAddThis: boolean;
+    private useModuleMap: {[id: string]: string};
 
     constructor(analysor: TsAnalysor, option: As2TsOption) {
         this.analysor = analysor;
@@ -156,6 +157,7 @@ export class TsMaker {
     make(ast: any, inputFolder: string, filePath: string): string {
         this.allTypes = [];
         this.importedMap = {};
+        this.useModuleMap = {};
         this.inputFolder = inputFolder;
         this.filePath = filePath;
         this.dirname = path.dirname(filePath);
@@ -1030,6 +1032,9 @@ export class TsMaker {
                 this.allTypes.push(str);
             }
         }
+        if(typeof(this.useModuleMap[str]) == 'string') {
+            str = this.useModuleMap[str];
+        }
         return str;
     }
 
@@ -1093,8 +1098,11 @@ export class TsMaker {
             }
         }
         if(asModuleFormular) {
-            sourceStr = ' = ' + asModuleFormular.module + '.' + idStr;
-            str += specifierStr + sourceStr + ';';
+            // console.log('%s -> %s', specifierStr, asModuleFormular.module + '.' + idStr);
+            this.useModuleMap[specifierStr] = asModuleFormular.module + '.' + idStr;
+            return '';
+            // sourceStr = ' = ' + asModuleFormular.module + '.' + idStr;
+            // str += specifierStr + sourceStr + ';';
         } else {
             if(this.option.noModule) {
                 let rp = path.relative(this.dirname, path.join(this.inputFolder, sourceValue)).replace(/\\/g, '/');
@@ -1540,7 +1548,7 @@ export class TsMaker {
     private codeFromTSModuleBlock(ast: TSModuleBlock): string {
         let str = '';
         for(let i = 0, len = ast.body.length; i < len; i++) {
-            if(i > 0) {
+            if(str) {
                 str += '\n';
             }
             str += this.codeFromAST(ast.body[i]);

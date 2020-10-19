@@ -125,6 +125,7 @@ var TsMaker = /** @class */ (function () {
     TsMaker.prototype.make = function (ast, inputFolder, filePath) {
         this.allTypes = [];
         this.importedMap = {};
+        this.useModuleMap = {};
         this.inputFolder = inputFolder;
         this.filePath = filePath;
         this.dirname = path.dirname(filePath);
@@ -878,6 +879,9 @@ var TsMaker = /** @class */ (function () {
                 this.allTypes.push(str);
             }
         }
+        if (typeof (this.useModuleMap[str]) == 'string') {
+            str = this.useModuleMap[str];
+        }
         return str;
     };
     TsMaker.prototype.codeFromIfStatement = function (ast) {
@@ -942,8 +946,11 @@ var TsMaker = /** @class */ (function () {
             }
         }
         if (asModuleFormular) {
-            sourceStr = ' = ' + asModuleFormular.module + '.' + idStr;
-            str += specifierStr + sourceStr + ';';
+            // console.log('%s -> %s', specifierStr, asModuleFormular.module + '.' + idStr);
+            this.useModuleMap[specifierStr] = asModuleFormular.module + '.' + idStr;
+            return '';
+            // sourceStr = ' = ' + asModuleFormular.module + '.' + idStr;
+            // str += specifierStr + sourceStr + ';';
         }
         else {
             if (this.option.noModule) {
@@ -1351,7 +1358,7 @@ var TsMaker = /** @class */ (function () {
     TsMaker.prototype.codeFromTSModuleBlock = function (ast) {
         var str = '';
         for (var i = 0, len = ast.body.length; i < len; i++) {
-            if (i > 0) {
+            if (str) {
                 str += '\n';
             }
             str += this.codeFromAST(ast.body[i]);
