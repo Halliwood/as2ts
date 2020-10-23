@@ -32,6 +32,7 @@ export class TsMaker {
     private allTypes: string[];
     private startAddThis: boolean;
     private useModuleMap: {[id: string]: string};
+    private extraImports: FromModule[];
 
     constructor(analysor: TsAnalysor, option: As2TsOption) {
         this.analysor = analysor;
@@ -158,6 +159,7 @@ export class TsMaker {
         this.allTypes = [];
         this.importedMap = {};
         this.useModuleMap = {};
+        this.extraImports = [];
         this.inputFolder = inputFolder;
         this.filePath = filePath;
         this.dirname = path.dirname(filePath);
@@ -188,6 +190,22 @@ export class TsMaker {
                     }
                 }              
             } 
+        }
+        for(let i = 0, len = this.extraImports.length; i < len; i++) {
+            let ei = this.extraImports[i];
+            if(this.option.noModule) {
+                let mstr = path.relative(this.dirname, path.join(inputFolder, ei.import)).replace(/\\+/g, '/');
+                if(!mstr) {
+                    mstr = '.';
+                }
+                else if(mstr.charAt(0) != '.') {
+                    mstr = './' + mstr;
+                }
+                importStr += 'import {' + ei.module + '} from "' + mstr + '";\n';
+            } else {
+                let mstr = ei.import.replace(/\//g, '.');
+                importStr += 'import ' + ei.module + ' = ' + mstr + ';\n';
+            }
         }
         if(importStr && !this.option.noModule) {
             importStr = this.indent(importStr);
@@ -996,14 +1014,11 @@ export class TsMaker {
 
     private codeFromIdentifier(ast: Identifier): string {
         let str = ast.name;
-        if(this.option.idReplacement && typeof(this.option.idReplacement[str]) === 'string') {
-            str = this.option.idReplacement[str];
-        }
         if(this.startAddThis && null != this.crtClass && null != this.crtFunc) {
             if((ast as any).__parent && (ast as any).__parent.type == AST_NODE_TYPES.VariableDeclarator) { 
                 this.crtFunc.localVars.push(str);
             }
-            else if(str != this.crtClass.name && (!(ast as any).__parent || this.parentNoThis.indexOf((ast as any).__parent.type) < 0 && ((ast as any).__parent.type != AST_NODE_TYPES.MemberExpression || (ast as any).__memberExp_is_object)) && 
+            else if(str != this.crtClass.name && (!(ast as any).__parent || this.parentNoThis.indexOf((ast as any).__parent.type) < 0 && ((ast as any).__parent.type != AST_NODE_TYPES.MemberExpression || (ast as any).__memberExp_is_object || (ast as any).__memberExp_is_computed_property)) && 
             this.crtFunc.params.indexOf(str) < 0 && this.crtFunc.localVars.indexOf(str) < 0) {
                 let minfo = this.getMemberInfo(this.crtClass, str);
                 if(minfo) {
@@ -1034,6 +1049,9 @@ export class TsMaker {
         }
         if(typeof(this.useModuleMap[str]) == 'string') {
             str = this.useModuleMap[str];
+        }
+        if(this.option.idReplacement && typeof(this.option.idReplacement[str]) === 'string') {
+            str = this.option.idReplacement[str];
         }
         return str;
     }
@@ -1100,6 +1118,9 @@ export class TsMaker {
         if(asModuleFormular) {
             // console.log('%s -> %s', specifierStr, asModuleFormular.module + '.' + idStr);
             this.useModuleMap[specifierStr] = asModuleFormular.module + '.' + idStr;
+            if(asModuleFormular.import && !this.extraImports.includes(asModuleFormular)) {
+                this.extraImports.push(asModuleFormular)
+            }
             return '';
             // sourceStr = ' = ' + asModuleFormular.module + '.' + idStr;
             // str += specifierStr + sourceStr + ';';
@@ -1176,6 +1197,7 @@ export class TsMaker {
         }
         let str = objStr;
         (ast.property as any).__parent = ast;
+        (ast.property as any).__memberExp_is_computed_property = ast.computed;
         let propertyStr = this.codeFromAST(ast.property);
         if (ast.computed) {
             str += '[' + propertyStr + ']';

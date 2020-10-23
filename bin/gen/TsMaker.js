@@ -126,6 +126,7 @@ var TsMaker = /** @class */ (function () {
         this.allTypes = [];
         this.importedMap = {};
         this.useModuleMap = {};
+        this.extraImports = [];
         this.inputFolder = inputFolder;
         this.filePath = filePath;
         this.dirname = path.dirname(filePath);
@@ -155,6 +156,23 @@ var TsMaker = /** @class */ (function () {
                         importStr += 'import ' + type + ' = ' + mstr + type + ';\n';
                     }
                 }
+            }
+        }
+        for (var i = 0, len = this.extraImports.length; i < len; i++) {
+            var ei = this.extraImports[i];
+            if (this.option.noModule) {
+                var mstr = path.relative(this.dirname, path.join(inputFolder, ei.import)).replace(/\\+/g, '/');
+                if (!mstr) {
+                    mstr = '.';
+                }
+                else if (mstr.charAt(0) != '.') {
+                    mstr = './' + mstr;
+                }
+                importStr += 'import {' + ei.module + '} from "' + mstr + '";\n';
+            }
+            else {
+                var mstr = ei.import.replace(/\//g, '.');
+                importStr += 'import ' + ei.module + ' = ' + mstr + ';\n';
             }
         }
         if (importStr && !this.option.noModule) {
@@ -838,14 +856,11 @@ var TsMaker = /** @class */ (function () {
     };
     TsMaker.prototype.codeFromIdentifier = function (ast) {
         var str = ast.name;
-        if (this.option.idReplacement && typeof (this.option.idReplacement[str]) === 'string') {
-            str = this.option.idReplacement[str];
-        }
         if (this.startAddThis && null != this.crtClass && null != this.crtFunc) {
             if (ast.__parent && ast.__parent.type == typescript_estree_1.AST_NODE_TYPES.VariableDeclarator) {
                 this.crtFunc.localVars.push(str);
             }
-            else if (str != this.crtClass.name && (!ast.__parent || this.parentNoThis.indexOf(ast.__parent.type) < 0 && (ast.__parent.type != typescript_estree_1.AST_NODE_TYPES.MemberExpression || ast.__memberExp_is_object)) &&
+            else if (str != this.crtClass.name && (!ast.__parent || this.parentNoThis.indexOf(ast.__parent.type) < 0 && (ast.__parent.type != typescript_estree_1.AST_NODE_TYPES.MemberExpression || ast.__memberExp_is_object || ast.__memberExp_is_computed_property)) &&
                 this.crtFunc.params.indexOf(str) < 0 && this.crtFunc.localVars.indexOf(str) < 0) {
                 var minfo = this.getMemberInfo(this.crtClass, str);
                 if (minfo) {
@@ -881,6 +896,9 @@ var TsMaker = /** @class */ (function () {
         }
         if (typeof (this.useModuleMap[str]) == 'string') {
             str = this.useModuleMap[str];
+        }
+        if (this.option.idReplacement && typeof (this.option.idReplacement[str]) === 'string') {
+            str = this.option.idReplacement[str];
         }
         return str;
     };
@@ -948,6 +966,9 @@ var TsMaker = /** @class */ (function () {
         if (asModuleFormular) {
             // console.log('%s -> %s', specifierStr, asModuleFormular.module + '.' + idStr);
             this.useModuleMap[specifierStr] = asModuleFormular.module + '.' + idStr;
+            if (asModuleFormular.import && !this.extraImports.includes(asModuleFormular)) {
+                this.extraImports.push(asModuleFormular);
+            }
             return '';
             // sourceStr = ' = ' + asModuleFormular.module + '.' + idStr;
             // str += specifierStr + sourceStr + ';';
@@ -1019,6 +1040,7 @@ var TsMaker = /** @class */ (function () {
         }
         var str = objStr;
         ast.property.__parent = ast;
+        ast.property.__memberExp_is_computed_property = ast.computed;
         var propertyStr = this.codeFromAST(ast.property);
         if (ast.computed) {
             str += '[' + propertyStr + ']';

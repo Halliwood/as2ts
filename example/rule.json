@@ -4,7 +4,10 @@
         "files": ["FyMsg.as", "DecodeUtil.as", "EncodeUtil.as", "SendMsgUtil.as"]
     }, 
     "idReplacement": {
-        "KW": "KeyWord"
+        "KW": "KeyWord", 
+        "Laya.Component": "Laya.UIComponent", 
+        "Laya.RaycastHit": "Laya.HitResult", 
+        "Laya.StandardMaterial": "Laya.BlinnPhongMaterial"
     }, 
     "literalReplacement": {
         "\"automatic/constants/KW\"": "\"automatic/constants/KeyWord\""
@@ -14,10 +17,10 @@
             {"module": "Protocol", "regular": "^automatic/protocol/(?!Macros|ErrorId)" }, 
             {"module": "GameConfig", "regular": "^automatic/cfgs/(?!ConfigDecoder)" }, 
             {"module": "Laya", "regular": "^laya/" }, 
-            {"module": "ui", "regular": "^ui/" }
+            {"module": "ui", "regular": "^ui/", "import": "ui/layaMaxUI" }
         ]
     }, 
-    "tsLibs": ["E:/qhgame/tsproj/libs/LayaAir.d.ts", "E:/qhgame/tsproj/src/ui/layaUI.max.all.ts"], 
+    "tsLibs": ["E:/qhgame/tsproj/libs/LayaAir.d.ts", "E:/qhgame/tsproj/libs/layaAir.minigame.d.ts", "E:/qhgame/tsproj/src/ui/layaMaxUI.ts"], 
     "noModule": true, 
     "errorDetail": true, 
     "terminateWhenError": true, 
