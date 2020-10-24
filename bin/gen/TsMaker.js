@@ -876,12 +876,16 @@ var TsMaker = /** @class */ (function () {
     };
     TsMaker.prototype.codeFromIdentifier = function (ast) {
         var str = ast.name;
-        if (this.startAddThis && null != this.crtClass && null != this.crtFunc) {
-            if (ast.__parent && ast.__parent.type == typescript_estree_1.AST_NODE_TYPES.VariableDeclarator) {
-                this.crtFunc.localVars.push(str);
+        if (this.startAddThis && null != this.crtClass) {
+            var needThis = true;
+            if (this.crtFunc) {
+                if (ast.__parent && ast.__parent.type == typescript_estree_1.AST_NODE_TYPES.VariableDeclarator) {
+                    this.crtFunc.localVars.push(str);
+                    needThis = false;
+                }
             }
-            else if (str != this.crtClass.name && (!ast.__parent || this.parentNoThis.indexOf(ast.__parent.type) < 0 && (ast.__parent.type != typescript_estree_1.AST_NODE_TYPES.MemberExpression || ast.__memberExp_is_object || ast.__memberExp_is_computed_property)) &&
-                this.crtFunc.params.indexOf(str) < 0 && this.crtFunc.localVars.indexOf(str) < 0) {
+            if (needThis && str != this.crtClass.name && (!ast.__parent || this.parentNoThis.indexOf(ast.__parent.type) < 0 && (ast.__parent.type != typescript_estree_1.AST_NODE_TYPES.MemberExpression || ast.__memberExp_is_object || ast.__memberExp_is_computed_property)) &&
+                (!this.crtFunc || this.crtFunc.params.indexOf(str) < 0 && this.crtFunc.localVars.indexOf(str) < 0)) {
                 var minfo = this.getMemberInfo(this.crtClass, str);
                 if (minfo) {
                     if (minfo.static) {

@@ -1034,12 +1034,16 @@ export class TsMaker {
 
     private codeFromIdentifier(ast: Identifier): string {
         let str = ast.name;
-        if(this.startAddThis && null != this.crtClass && null != this.crtFunc) {
-            if((ast as any).__parent && (ast as any).__parent.type == AST_NODE_TYPES.VariableDeclarator) { 
-                this.crtFunc.localVars.push(str);
+        if(this.startAddThis && null != this.crtClass) {
+            let needThis = true;
+            if(this.crtFunc) {
+                if((ast as any).__parent && (ast as any).__parent.type == AST_NODE_TYPES.VariableDeclarator) { 
+                    this.crtFunc.localVars.push(str);
+                    needThis = false;
+                }
             }
-            else if(str != this.crtClass.name && (!(ast as any).__parent || this.parentNoThis.indexOf((ast as any).__parent.type) < 0 && ((ast as any).__parent.type != AST_NODE_TYPES.MemberExpression || (ast as any).__memberExp_is_object || (ast as any).__memberExp_is_computed_property)) && 
-            this.crtFunc.params.indexOf(str) < 0 && this.crtFunc.localVars.indexOf(str) < 0) {
+            if(needThis && str != this.crtClass.name && (!(ast as any).__parent || this.parentNoThis.indexOf((ast as any).__parent.type) < 0 && ((ast as any).__parent.type != AST_NODE_TYPES.MemberExpression || (ast as any).__memberExp_is_object || (ast as any).__memberExp_is_computed_property)) && 
+            (!this.crtFunc || this.crtFunc.params.indexOf(str) < 0 && this.crtFunc.localVars.indexOf(str) < 0)) {
                 let minfo = this.getMemberInfo(this.crtClass, str);
                 if(minfo) {
                     if(minfo.static) {
