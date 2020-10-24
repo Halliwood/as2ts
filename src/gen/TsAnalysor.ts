@@ -44,6 +44,7 @@ export class ClassInfo {
     propertyMap: {[name: string]: PropertyInfo} = {};
     privateProperties: string[] = [];
     functionMap: {[name: string]: FunctionInfo} = {};
+    anoymousFuncCnt: number = 0;
 
     get fullName(): string {
         if(!this.module) return this.name;
@@ -359,6 +360,7 @@ export class TsAnalysor {
         this.crtClass.declare = ast.declare;
         this.crtClass.name = className;
         this.crtClass.module = this.crtModule || this.module;
+        this.crtClass.anoymousFuncCnt = 0;
         this.classMap[className] = this.crtClass;
         if(this.crtClass.module) {
             this.classMap[this.crtClass.fullName] = this.crtClass;
@@ -382,6 +384,9 @@ export class TsAnalysor {
             propertyInfo.static = ast.static;
             propertyInfo.className = this.crtClass.name;
             this.crtClass.propertyMap[propertyName] = propertyInfo;
+        }
+        if(ast.value) {
+            this.processAST(ast.value);
         }
     }
 
@@ -430,7 +435,7 @@ export class TsAnalysor {
         if (!funcName && ast.id) {
             funcName = this.codeFromAST(ast.id);
         }
-        // if(this.fullPath.indexOf('WxXinghanPlat') >= 0) {
+        // if(this.fullPath.indexOf('WxRoot') >= 0) {
         //     console.log('processFunctionExpression: ', funcName ? funcName : 'no name', ast.params ? ast.params.length : 'no param');
         // }
 
@@ -442,16 +447,21 @@ export class TsAnalysor {
             funcInfo.static = isStatic;
             funcInfo.className = this.crtClass.name;
             if(this.crtFunc) {
-                // 这是一个匿名函数
+                // 这是函数内的一个匿名函数
                 this.assert(!funcName, ast, 'It should be an anoymous function!');
                 this.crtFunc.anoymousFuncCnt++;
                 funcInfo.name = this.crtFunc.name + '~' + this.crtFunc.anoymousFuncCnt;
                 funcInfo.parentFunc = this.crtFunc;
             } else {
+                if(!funcName) {
+                    // 这是一个函数外的匿名函数
+                    this.crtClass.anoymousFuncCnt++;
+                    funcName = '~function' + this.crtClass.anoymousFuncCnt;
+                }
                 funcInfo.name = funcName;
                 funcInfo.parentFunc = null;
             }
-            // if(this.fullPath.indexOf('WxXinghanPlat') >= 0) {
+            // if(this.fullPath.indexOf('WxRoot') >= 0) {
             //     console.log('func: ', funcInfo.toString());
             // }
             this.crtClass.functionMap[funcInfo.name] = funcInfo;
@@ -634,6 +644,7 @@ export class TsAnalysor {
         this.crtClass = new ClassInfo();
         this.crtClass.name = className;
         this.crtClass.module = this.crtModule || this.module;
+        this.crtClass.anoymousFuncCnt = 0;
         this.classMap[className] = this.crtClass;
         if(this.crtClass.module) {
             this.classMap[this.crtClass.fullName] = this.crtClass;

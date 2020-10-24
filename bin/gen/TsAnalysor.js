@@ -56,6 +56,7 @@ var ClassInfo = /** @class */ (function () {
         this.propertyMap = {};
         this.privateProperties = [];
         this.functionMap = {};
+        this.anoymousFuncCnt = 0;
     }
     Object.defineProperty(ClassInfo.prototype, "fullName", {
         get: function () {
@@ -309,6 +310,7 @@ var TsAnalysor = /** @class */ (function () {
         this.crtClass.declare = ast.declare;
         this.crtClass.name = className;
         this.crtClass.module = this.crtModule || this.module;
+        this.crtClass.anoymousFuncCnt = 0;
         this.classMap[className] = this.crtClass;
         if (this.crtClass.module) {
             this.classMap[this.crtClass.fullName] = this.crtClass;
@@ -330,6 +332,9 @@ var TsAnalysor = /** @class */ (function () {
             propertyInfo.static = ast.static;
             propertyInfo.className = this.crtClass.name;
             this.crtClass.propertyMap[propertyName] = propertyInfo;
+        }
+        if (ast.value) {
+            this.processAST(ast.value);
         }
     };
     TsAnalysor.prototype.processConditionalExpression = function (ast) {
@@ -369,7 +374,7 @@ var TsAnalysor = /** @class */ (function () {
         if (!funcName && ast.id) {
             funcName = this.codeFromAST(ast.id);
         }
-        // if(this.fullPath.indexOf('WxXinghanPlat') >= 0) {
+        // if(this.fullPath.indexOf('WxRoot') >= 0) {
         //     console.log('processFunctionExpression: ', funcName ? funcName : 'no name', ast.params ? ast.params.length : 'no param');
         // }
         if (this.crtClass) {
@@ -381,17 +386,22 @@ var TsAnalysor = /** @class */ (function () {
             funcInfo.static = isStatic;
             funcInfo.className = this.crtClass.name;
             if (this.crtFunc) {
-                // 这是一个匿名函数
+                // 这是函数内的一个匿名函数
                 this.assert(!funcName, ast, 'It should be an anoymous function!');
                 this.crtFunc.anoymousFuncCnt++;
                 funcInfo.name = this.crtFunc.name + '~' + this.crtFunc.anoymousFuncCnt;
                 funcInfo.parentFunc = this.crtFunc;
             }
             else {
+                if (!funcName) {
+                    // 这是一个函数外的匿名函数
+                    this.crtClass.anoymousFuncCnt++;
+                    funcName = '~function' + this.crtClass.anoymousFuncCnt;
+                }
                 funcInfo.name = funcName;
                 funcInfo.parentFunc = null;
             }
-            // if(this.fullPath.indexOf('WxXinghanPlat') >= 0) {
+            // if(this.fullPath.indexOf('WxRoot') >= 0) {
             //     console.log('func: ', funcInfo.toString());
             // }
             this.crtClass.functionMap[funcInfo.name] = funcInfo;
@@ -550,6 +560,7 @@ var TsAnalysor = /** @class */ (function () {
         this.crtClass = new ClassInfo();
         this.crtClass.name = className;
         this.crtClass.module = this.crtModule || this.module;
+        this.crtClass.anoymousFuncCnt = 0;
         this.classMap[className] = this.crtClass;
         if (this.crtClass.module) {
             this.classMap[this.crtClass.fullName] = this.crtClass;

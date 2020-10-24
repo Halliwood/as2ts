@@ -1,5 +1,5 @@
 export interface FromModule {
-    /**导出的模块名 */
+    /**导入的模块名 */
     "module": string, 
     /**匹配规则，支持正则表达式匹配 */
     "regular": string, 
@@ -8,7 +8,7 @@ export interface FromModule {
 }
 
 export interface As2TsImportRule {
-    /**需要导出为模块的规则 */
+    /**需要以模块形式进行import导入的规则 */
     "fromModule"?: FromModule[]
 }
 

@@ -147,7 +147,7 @@ var Main = /** @class */ (function () {
         }
     };
     Main.prototype.doTranslateFile = function (filePath, phase) {
-        // if(filePath.indexOf('WanXianPanel.as')<0) return;
+        // if(filePath.indexOf('WxXinghanPlat.as')<0) return;
         var relativePath = path.relative(this.inputFolder, filePath);
         if (this.transOption.skipRule && this.transOption.skipRule.files) {
             for (var _i = 0, _a = this.transOption.skipRule.files; _i < _a.length; _i++) {
@@ -188,6 +188,7 @@ var Main = /** @class */ (function () {
             this.tsAnalysor.collect(ast, filePath, relativePath);
         }
         else {
+            // if(filePath.indexOf('WxRoot.as')<0) return;
             var outFilePath = filePath.replace(this.inputFolder, this.outputFolder);
             var tsFilePath = outFilePath.replace(/\.as$/, '.ts');
             console.log('\x1B[1A\x1B[Kmaking: %s', tsFilePath);

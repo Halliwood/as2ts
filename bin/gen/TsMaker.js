@@ -627,6 +627,7 @@ var TsMaker = /** @class */ (function () {
         var className = this.codeFromAST(ast.id);
         this.importedMap[className] = true;
         this.crtClass = this.analysor.classMap[className];
+        this.crtClass.anoymousFuncCnt = 0;
         this.assert(null != this.crtClass, ast, '[ERROR]Cannot find class info: ' + className);
         var str = '';
         if (ast.__exported) {
@@ -813,7 +814,7 @@ var TsMaker = /** @class */ (function () {
             if (funcName == this.crtClass.name)
                 funcName = 'constructor';
             if (this.crtFunc) {
-                // 这是一个匿名函数
+                // 这是函数内的一个匿名函数
                 this.crtFunc.anoymousFuncCnt++;
                 var internalFuncName = this.crtFunc.name + '~' + this.crtFunc.anoymousFuncCnt;
                 var funcInfo = this.crtClass.functionMap[internalFuncName];
@@ -823,8 +824,14 @@ var TsMaker = /** @class */ (function () {
                 this.crtFunc = funcInfo;
             }
             else {
-                var funcInfo = this.crtClass.functionMap[funcName];
-                this.assert(null != funcInfo, ast, 'Could not find function info: ' + funcName);
+                var funcKey = funcName;
+                if ('function' == funcName) {
+                    // 这是一个函数外的匿名函数
+                    this.crtClass.anoymousFuncCnt++;
+                    funcKey = '~function' + this.crtClass.anoymousFuncCnt;
+                }
+                var funcInfo = this.crtClass.functionMap[funcKey];
+                this.assert(null != funcInfo, ast, 'Could not find function info: ' + funcKey);
                 funcInfo.anoymousFuncCnt = 0;
                 funcInfo.parentFunc = null;
                 this.crtFunc = funcInfo;

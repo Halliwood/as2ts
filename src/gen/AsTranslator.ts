@@ -37,24 +37,24 @@ export class AsTranslator {
         }
         asContent = asLines.join('\n');
         // 修改var
-        asContent = asContent.replace(/(?<=public)\s+var/g, '');
-        asContent = asContent.replace(/(?<=protected)\s+var/g, '');
-        asContent = asContent.replace(/(?<=private)\s+var/g, '');
-        asContent = asContent.replace(/(?<=static)\s+var/g, '');
+        asContent = asContent.replace(/(?<=public)\s+\bvar\b/g, '');
+        asContent = asContent.replace(/(?<=protected)\s+\bvar\b/g, '');
+        asContent = asContent.replace(/(?<=private)\s+\bvar\b/g, '');
+        asContent = asContent.replace(/(?<=static)\s+\bvar\b/g, '');
 
         // 去掉override关键字
-        asContent = asContent.replace(/(?<=public)\s+override/g, '');
-        asContent = asContent.replace(/(?<=protected)\s+override/g, '');
-        asContent = asContent.replace(/(?<=private)\s+override/g, '');
-        asContent = asContent.replace(/override\s+(?=public)/g, '');
-        asContent = asContent.replace(/override\s+(?=protected)/g, '');
-        asContent = asContent.replace(/override\s+(?=private)/g, '');
+        asContent = asContent.replace(/(?<=public)\s+\boverride\b/g, '');
+        asContent = asContent.replace(/(?<=protected)\s+\boverride\b/g, '');
+        asContent = asContent.replace(/(?<=private)\s+\boverride\b/g, '');
+        asContent = asContent.replace(/\boverride\b\s+(?=public)/g, '');
+        asContent = asContent.replace(/\boverride\b\s+(?=protected)/g, '');
+        asContent = asContent.replace(/\boverride\b\s+(?=private)/g, '');
 
         // 去掉function关键字
-        asContent = asContent.replace(/(?<=public)\s+function/g, '');
-        asContent = asContent.replace(/(?<=protected)\s+function/g, '');
-        asContent = asContent.replace(/(?<=private)\s+function/g, '');
-        asContent = asContent.replace(/(?<=static)\s+function/g, '');
+        asContent = asContent.replace(/(?<=public)\s+\bfunction\b/g, '');
+        asContent = asContent.replace(/(?<=protected)\s+\bfunction\b/g, '');
+        asContent = asContent.replace(/(?<=private)\s+\bfunction\b/g, '');
+        asContent = asContent.replace(/(?<=static)\s+\bfunction\b/g, '');
         asContent = asContent.replace(/(?<=\s)function(?=\s+\w+)/g, '');
 
         // is改instanceof
