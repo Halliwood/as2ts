@@ -1741,7 +1741,7 @@ export class TsMaker {
     private assert(cond: boolean, ast: BaseNode, message: string = null) {
         if (!cond) {
             if (this.option.errorDetail) {
-                console.log(util.inspect(ast, true, 6));
+                console.log(util.inspect(ast, true, 2));
             }
             console.log('\x1B[36m%s\x1B[0m(tmp/tmp.ts:\x1B[33m%d:%d\x1B[0m) - \x1B[31merror\x1B[0m: %s', this.relativePath, 
                 ast.loc ? ast.loc.start.line : -1, 

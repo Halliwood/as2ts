@@ -283,6 +283,7 @@ var TsAnalysor = /** @class */ (function () {
         }
     };
     TsAnalysor.prototype.processCallExpression = function (ast) {
+        this.processAST(ast.callee);
         for (var i = 0, len = ast.arguments.length; i < len; i++) {
             var arg = ast.arguments[i];
             this.processAST(arg);
@@ -368,6 +369,9 @@ var TsAnalysor = /** @class */ (function () {
         if (!funcName && ast.id) {
             funcName = this.codeFromAST(ast.id);
         }
+        // if(this.fullPath.indexOf('WxXinghanPlat') >= 0) {
+        //     console.log('processFunctionExpression: ', funcName ? funcName : 'no name', ast.params ? ast.params.length : 'no param');
+        // }
         if (this.crtClass) {
             if (funcName == this.crtClass.name)
                 funcName = 'constructor';
@@ -387,6 +391,9 @@ var TsAnalysor = /** @class */ (function () {
                 funcInfo.name = funcName;
                 funcInfo.parentFunc = null;
             }
+            // if(this.fullPath.indexOf('WxXinghanPlat') >= 0) {
+            //     console.log('func: ', funcInfo.toString());
+            // }
             this.crtClass.functionMap[funcInfo.name] = funcInfo;
             this.crtFunc = funcInfo;
         }

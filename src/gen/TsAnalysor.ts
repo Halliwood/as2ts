@@ -331,6 +331,7 @@ export class TsAnalysor {
     }
 
     private processCallExpression(ast: CallExpression) {
+        this.processAST(ast.callee);
         for (let i = 0, len = ast.arguments.length; i < len; i++) {
             let arg = ast.arguments[i];
             this.processAST(arg);
@@ -429,6 +430,9 @@ export class TsAnalysor {
         if (!funcName && ast.id) {
             funcName = this.codeFromAST(ast.id);
         }
+        // if(this.fullPath.indexOf('WxXinghanPlat') >= 0) {
+        //     console.log('processFunctionExpression: ', funcName ? funcName : 'no name', ast.params ? ast.params.length : 'no param');
+        // }
 
         if(this.crtClass) {
             if(funcName == this.crtClass.name) funcName = 'constructor';
@@ -447,6 +451,9 @@ export class TsAnalysor {
                 funcInfo.name = funcName;
                 funcInfo.parentFunc = null;
             }
+            // if(this.fullPath.indexOf('WxXinghanPlat') >= 0) {
+            //     console.log('func: ', funcInfo.toString());
+            // }
             this.crtClass.functionMap[funcInfo.name] = funcInfo;
             this.crtFunc = funcInfo;
         }
