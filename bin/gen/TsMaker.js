@@ -995,7 +995,10 @@ var TsMaker = /** @class */ (function () {
         }
         else {
             if (this.option.noModule) {
-                var rp = path.relative(this.dirname, path.join(this.inputFolder, sourceValue)).replace(/\\/g, '/');
+                // 需要加上.ts指定为相对于引入文件的相对路径，否则当import的文件名和同名文件夹同时存在时，相对路径会不正确
+                // 比如import进来的是xxx/Plat.as，而同时存在xxx/plat文件夹
+                var rp = path.relative(this.dirname, path.join(this.inputFolder, sourceValue) + '.ts').replace(/\\/g, '/');
+                rp = rp.substr(0, rp.length - 3);
                 if (rp.charAt(0) != '.')
                     rp = './' + rp;
                 str += '{' + specifierStr + '} from "' + rp + '";';
@@ -1138,7 +1141,11 @@ var TsMaker = /** @class */ (function () {
     };
     TsMaker.prototype.codeFromProperty = function (ast) {
         ast.key.__parent = ast;
-        return this.codeFromAST(ast.key) + ': ' + this.codeFromAST(ast.value);
+        var str = this.codeFromAST(ast.key) + ': ';
+        this.startAddThis = true;
+        str += this.codeFromAST(ast.value);
+        this.startAddThis = false;
+        return str;
     };
     TsMaker.prototype.codeFromRestElement = function (ast) {
         return '...' + this.codeFromAST(ast.argument);
@@ -1400,10 +1407,13 @@ var TsMaker = /** @class */ (function () {
     TsMaker.prototype.codeFromTSModuleBlock = function (ast) {
         var str = '';
         for (var i = 0, len = ast.body.length; i < len; i++) {
-            if (str) {
-                str += '\n';
+            var bodyStr = this.codeFromAST(ast.body[i]);
+            if (bodyStr) {
+                if (str) {
+                    str += '\n';
+                }
+                str += bodyStr;
             }
-            str += this.codeFromAST(ast.body[i]);
         }
         return str;
     };
