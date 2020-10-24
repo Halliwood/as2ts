@@ -28,6 +28,9 @@ export class FunctionInfo extends PropertyInfo {
     params: string[] = [];
     localVars: string[] = [];
 
+    anoymousFuncCnt: number = 0;
+    parentFunc: FunctionInfo;
+
     toString(): string {
         return super.toString() + '(' + this.params.join(', ') + ')';
     }
@@ -93,12 +96,36 @@ export class TsAnalysor {
 
     private processAST(ast: any) {
         switch (ast.type) {
+            case AST_NODE_TYPES.ArrayExpression:
+                this.processArrayExpression(ast);
+                break;
+
+            case AST_NODE_TYPES.ArrayPattern:
+                this.processArrayPattern(ast);
+                break;
+
+            case AST_NODE_TYPES.ArrowFunctionExpression:
+                this.processArrowFunctionExpression(ast);
+                break;
+
+            case AST_NODE_TYPES.AssignmentExpression:
+                this.processAssignmentExpression(ast);
+                break;
+
             case AST_NODE_TYPES.AssignmentPattern:
                 this.processAssignmentPattern(ast);
                 break;
 
+            case AST_NODE_TYPES.BinaryExpression:
+                this.processBinaryExpression(ast);
+                break;
+
             case AST_NODE_TYPES.BlockStatement:
                 this.processBlockStatement(ast);
+                break;
+
+            case AST_NODE_TYPES.CallExpression:
+                this.processCallExpression(ast);
                 break;
 
             case AST_NODE_TYPES.ClassBody:
@@ -117,12 +144,28 @@ export class TsAnalysor {
                 this.processClassProperty(ast);
                 break;
 
+            case AST_NODE_TYPES.ConditionalExpression:
+                this.processConditionalExpression(ast);
+                break;
+
             case AST_NODE_TYPES.ExportNamedDeclaration:
                 this.processExportNamedDeclaration(ast);
                 break;
 
             case AST_NODE_TYPES.ExpressionStatement:
                 this.processExpressionStatement(ast);
+                break;
+
+            case AST_NODE_TYPES.ForInStatement:
+                this.processForInStatement(ast);
+                break;
+
+            case AST_NODE_TYPES.ForOfStatement:
+                this.processForOfStatement(ast);
+                break;
+
+            case AST_NODE_TYPES.ForStatement:
+                this.processForStatement(ast);
                 break;
 
             case AST_NODE_TYPES.FunctionDeclaration:
@@ -137,12 +180,88 @@ export class TsAnalysor {
                 this.processIdentifier(ast);
                 break;
 
+            case AST_NODE_TYPES.IfStatement:
+                this.processIfStatement(ast);
+                break;
+
+            case AST_NODE_TYPES.LogicalExpression:
+                this.processLogicalExpression(ast);
+                break;
+
+            case AST_NODE_TYPES.MemberExpression:
+                this.processMemberExpression(ast);
+                break;
+
             case AST_NODE_TYPES.MethodDefinition:
                 this.processMethodDefinition(ast);
                 break;
 
+            case AST_NODE_TYPES.NewExpression:
+                this.processNewExpression(ast);
+                break;
+
+            case AST_NODE_TYPES.ObjectExpression:
+                this.processObjectExpression(ast);
+                break;
+
+            case AST_NODE_TYPES.ObjectPattern:
+                this.processObjectPattern(ast);
+                break;
+
             case AST_NODE_TYPES.Program:
                 this.processProgram(ast);
+                break;
+
+            case AST_NODE_TYPES.Property:
+                this.processProperty(ast);
+                break;
+
+            case AST_NODE_TYPES.ReturnStatement:
+                this.processReturnStatement(ast);
+                break;
+
+            case AST_NODE_TYPES.SequenceExpression:
+                this.processSequenceExpression(ast);
+                break;
+
+            case AST_NODE_TYPES.SwitchCase:
+                this.processSwitchCase(ast);
+                break;
+
+            case AST_NODE_TYPES.SwitchStatement:
+                this.processSwitchStatement(ast);
+                break;
+
+            case AST_NODE_TYPES.ThrowStatement:
+                this.processThrowStatement(ast);
+                break;
+
+            case AST_NODE_TYPES.TryStatement:
+                this.processTryStatement(ast);
+                break;
+
+            case AST_NODE_TYPES.UnaryExpression:
+                this.processUnaryExpression(ast);
+                break;
+
+            case AST_NODE_TYPES.UpdateExpression:
+                this.processUpdateExpression(ast);
+                break;
+
+            case AST_NODE_TYPES.VariableDeclaration:
+                this.processVariableDeclaration(ast);
+                break;
+
+            case AST_NODE_TYPES.VariableDeclarator:
+                this.processVariableDeclarator(ast);
+                break;
+
+            case AST_NODE_TYPES.WhileStatement:
+                this.processWhileStatement(ast);
+                break;
+
+            case AST_NODE_TYPES.TSInterfaceBody:
+                this.processTSInterfaceBody(ast);
                 break;
 
             case AST_NODE_TYPES.TSAbstractMethodDefinition:
@@ -166,15 +285,55 @@ export class TsAnalysor {
         }
     }
 
+    private processArrayExpression(ast: ArrayExpression) {
+        for (let i = 0, len = ast.elements.length; i < len; i++) {
+            this.processAST(ast.elements[i]);
+        }
+    }
+
+    private processArrayPattern(ast: ArrayPattern) {
+        this.assert(false, ast, 'Not support ArrayPattern yet!');
+    }
+
+    private processArrowFunctionExpression(ast: ArrowFunctionExpression) {
+        if (ast.params) {
+            for (let i = 0, len = ast.params.length; i < len; i++) {
+                let oneParam = ast.params[i];
+                this.processAST(oneParam);
+            }
+        }
+        if (ast.body) {
+            this.processAST(ast.body);
+        }
+        this.assert(!ast.generator, ast, 'Not support generator yet!');
+        this.assert(!ast.async, ast, 'Not support async yet!');
+        this.assert(!ast.expression, ast, 'Not support expression yet!');
+    }
+
+    private processAssignmentExpression(ast: AssignmentExpression) {
+        this.processBinaryExpression(ast as any);
+    }
+
     private processAssignmentPattern(ast: AssignmentPattern) {
         if((ast as any).__isFuncParam) (ast.left as any).__isFuncParam = true;
         this.processAST(ast.left);
+    }
+
+    private processBinaryExpression(ast: BinaryExpression) {
+        this.processAST(ast.right);
     }
 
     private processBlockStatement(ast: BlockStatement) {
         for (let i = 0, len = ast.body.length; i < len; i++) {
             let bodyEle = ast.body[i];
             this.processAST(bodyEle);
+        }
+    }
+
+    private processCallExpression(ast: CallExpression) {
+        for (let i = 0, len = ast.arguments.length; i < len; i++) {
+            let arg = ast.arguments[i];
+            this.processAST(arg);
         }
     }
 
@@ -225,12 +384,37 @@ export class TsAnalysor {
         }
     }
 
+    private processConditionalExpression(ast: ConditionalExpression) {
+        this.processAST(ast.test);
+        this.processAST(ast.consequent);
+        this.processAST(ast.alternate);
+    }
+
     private processExportNamedDeclaration(ast: ExportNamedDeclaration) {
         this.processAST(ast.declaration);
     }
 
     private processExpressionStatement(ast: ExpressionStatement) {
         this.processAST(ast.expression);
+    }
+
+    private processForInStatement(ast: ForInStatement) {
+        this.processAST(ast.left);
+        this.processAST(ast.right);
+        this.processAST(ast.body);
+    }
+
+    private processForOfStatement(ast: ForOfStatement) {
+        this.processAST(ast.left);
+        this.processAST(ast.right);
+        this.processAST(ast.body);
+    }
+
+    private processForStatement(ast: ForStatement) {
+        this.processAST(ast.init);
+        this.processAST(ast.test);
+        this.processAST(ast.update);
+        this.processAST(ast.body);
     }
 
     private processFunctionDeclaration(ast: FunctionDeclaration) {
@@ -245,18 +429,26 @@ export class TsAnalysor {
         if (!funcName && ast.id) {
             funcName = this.codeFromAST(ast.id);
         }
-        if(!funcName) {
-            funcName = 'function';
-        }
 
         if(this.crtClass) {
             if(funcName == this.crtClass.name) funcName = 'constructor';
-            this.crtFunc = new FunctionInfo();
-            this.crtFunc.name = funcName;
-            this.crtFunc.accessibility = accessibility;
-            this.crtFunc.static = isStatic;
-            this.crtFunc.className = this.crtClass.name;
-            this.crtClass.functionMap[funcName] = this.crtFunc;
+            let funcInfo = new FunctionInfo();
+            funcInfo.anoymousFuncCnt = 0;
+            funcInfo.accessibility = accessibility;
+            funcInfo.static = isStatic;
+            funcInfo.className = this.crtClass.name;
+            if(this.crtFunc) {
+                // 这是一个匿名函数
+                this.assert(!funcName, ast, 'It should be an anoymous function!');
+                this.crtFunc.anoymousFuncCnt++;
+                funcInfo.name = this.crtFunc.name + '~' + this.crtFunc.anoymousFuncCnt;
+                funcInfo.parentFunc = this.crtFunc;
+            } else {
+                funcInfo.name = funcName;
+                funcInfo.parentFunc = null;
+            }
+            this.crtClass.functionMap[funcInfo.name] = funcInfo;
+            this.crtFunc = funcInfo;
         }
         if (ast.params) {
             for (let i = 0, len = ast.params.length; i < len; i++) {
@@ -266,7 +458,8 @@ export class TsAnalysor {
                 this.processAST(oneParam);
             }
         }
-        this.crtFunc = null;
+        if(ast.body) this.processAST(ast.body);
+        this.crtFunc = this.crtFunc.parentFunc;
     }
 
     private processIdentifier(ast: Identifier) {
@@ -274,6 +467,24 @@ export class TsAnalysor {
         if((ast as any).__isFuncParam && this.crtFunc) {
             this.crtFunc.params.push(str);
         }
+    }
+
+    private processIfStatement(ast: IfStatement) {
+        this.processAST(ast.test);
+        this.processAST(ast.consequent);
+        if (ast.alternate && (ast.alternate.type != AST_NODE_TYPES.BlockStatement || (ast.alternate as BlockStatement).body.length > 0)) {
+            this.processAST(ast.alternate);
+        }
+    }
+
+    private processLogicalExpression(ast: LogicalExpression) {
+        this.processAST(ast.left);
+        this.processAST(ast.right);
+    }
+
+    private processMemberExpression(ast: MemberExpression) {
+        this.processAST(ast.object);
+        this.processAST(ast.property);
     }
 
     private processMethodDefinition(ast: MethodDefinition) {
@@ -284,10 +495,109 @@ export class TsAnalysor {
         this.processFunctionExpressionInternal(funcName, ast.static, ast.kind, ast.accessibility, ast.value as FunctionExpression);
     }
 
+    private processNewExpression(ast: NewExpression) {
+        this.processAST(ast.callee);
+        for (let i = 0, len = ast.arguments.length; i < len; i++) {
+            this.processAST(ast.arguments[i]);
+        }
+    }
+
+    private processObjectExpression(ast: ObjectExpression) {
+        for (let i = 0, len = ast.properties.length; i < len; i++) {
+            this.processAST(ast.properties[i]);
+        }
+    }
+
+    private processObjectPattern(ast: ObjectPattern) {
+        this.assert(false, ast, 'Not support ObjectPattern yet!');
+    }
+
     private processProgram(ast: Program) {
         for (let i = 0, len = ast.body.length; i < len; i++) {
             let stm = ast.body[i];
             this.processAST(stm);
+        }
+    }
+
+    private processProperty(ast: Property) {
+        this.processAST(ast.key);
+        this.processAST(ast.value);
+    }
+
+    private processReturnStatement(ast: ReturnStatement) {
+        if(ast.argument) {
+            this.processAST(ast.argument);
+        }
+    }
+
+    private processSequenceExpression(ast: SequenceExpression) {
+        for (var i = 0, len = ast.expressions.length; i < len; i++) {
+            this.processAST(ast.expressions[i]);
+        }
+    }
+
+    private processSwitchCase(ast: SwitchCase) {
+        if (ast.test) {
+            this.processAST(ast.test);
+        }
+        for (let i = 0, len = ast.consequent.length; i < len; i++) {
+            if (ast.consequent[i].type != AST_NODE_TYPES.BreakStatement) {
+                this.processAST(ast.consequent[i]);
+            }
+        }
+    }
+
+    private processSwitchStatement(ast: SwitchStatement) {
+        this.processAST(ast.discriminant) ;
+        for (let i = 0, len = ast.cases.length; i < len; i++) {
+            this.processSwitchCase(ast.cases[i]);
+        }
+    }
+
+    private processThrowStatement(ast: ThrowStatement) {
+        this.processAST(ast.argument);
+    }
+
+    private processTryStatement(ast: TryStatement) {
+        this.processAST(ast.block);
+        if (ast.handler) {
+            this.processAST(ast.handler);
+        }
+        if (ast.finalizer) {
+            this.processAST(ast.finalizer);
+        }
+    }
+
+    private processUnaryExpression(ast: UnaryExpression) {
+        this.processAST(ast.argument);
+    }
+
+    private processUpdateExpression(ast: UpdateExpression) {
+        this.processAST(ast.argument);
+    }
+
+    private processVariableDeclaration(ast: VariableDeclaration) {
+        for (let i = 0, len = ast.declarations.length; i < len; i++) {
+            let d = ast.declarations[i];
+            this.processVariableDeclarator(d);
+        }
+    }
+
+    private processVariableDeclarator(ast: VariableDeclarator) {
+        this.processAST(ast.id);
+        if (ast.init) {
+            this.processAST(ast.init);
+        }
+    }
+
+    private processWhileStatement(ast: WhileStatement) {
+        this.processAST(ast.test);
+        this.processAST(ast.body);
+    }
+
+    private processTSInterfaceBody(ast: TSInterfaceBody) {
+        for(let i = 0, len = ast.body.length; i < len; i++) {
+            this.codeFromAST(ast.body[i]);
         }
     }
 

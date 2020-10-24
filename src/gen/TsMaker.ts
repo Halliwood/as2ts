@@ -969,7 +969,23 @@ export class TsMaker {
 
         if(this.crtClass) {
             if(funcName == this.crtClass.name) funcName = 'constructor';
-            this.crtFunc = this.crtClass.functionMap[funcName];
+            if(this.crtFunc) {
+                // 这是一个匿名函数
+                this.crtFunc.anoymousFuncCnt++;
+                let internalFuncName = this.crtFunc.name + '~' + this.crtFunc.anoymousFuncCnt;
+                let funcInfo = this.crtClass.functionMap[internalFuncName];
+                this.assert(null != funcInfo, ast, 'Could not find function info: ' + internalFuncName);
+                funcInfo.anoymousFuncCnt = 0;
+                funcInfo.parentFunc = this.crtFunc;
+                this.crtFunc = funcInfo;
+            }
+            else {
+                let funcInfo = this.crtClass.functionMap[funcName];
+                this.assert(null != funcInfo, ast, 'Could not find function info: ' + funcName);
+                funcInfo.anoymousFuncCnt = 0;
+                funcInfo.parentFunc = null;
+                this.crtFunc = funcInfo;
+            }
         }
         str += funcName + '(';
         if (ast.params) {
@@ -990,9 +1006,11 @@ export class TsMaker {
         str += ' {\n';
 
         if (ast.body) {
-            // 构造函数加上super
-            this.startAddThis = true;
+            if(!this.crtFunc.parentFunc) {
+                this.startAddThis = true;
+            }
             let bodyStr = this.codeFromAST(ast.body);
+            // 构造函数加上super
             if('constructor' == funcName && this.crtClass.superClass && bodyStr.indexOf('super(') < 0) {
                 if(bodyStr) {
                     bodyStr = 'super();\n' + bodyStr;
@@ -1000,7 +1018,9 @@ export class TsMaker {
                     bodyStr = 'super();';
                 }
             }
-            this.startAddThis = false;
+            if(!this.crtFunc.parentFunc) {
+                this.startAddThis = false;
+            }
             str += this.indent(bodyStr);
         }
         str += '\n}'
@@ -1008,7 +1028,7 @@ export class TsMaker {
         this.assert(!ast.async, ast, 'Not support async yet!');
         this.assert(!ast.expression, ast, 'Not support expression yet!');
         this.assert(!ast.declare, ast, 'Not support declare yet!');
-        this.crtFunc = null;
+        this.crtFunc = this.crtFunc.parentFunc;
         return str;
     }
 
@@ -1034,8 +1054,8 @@ export class TsMaker {
                         this.allTypes.push(str);
                     }
                 } 
-            }
-        }
+            } 
+        } 
         if(ast.typeAnnotation) {
             if(!(ast as any).__parent || ((ast as any).__parent.type != AST_NODE_TYPES.CatchClause && (!(ast as any).__parent.__parent || !(ast as any).__parent.__parent.__parent || AST_NODE_TYPES.ForInStatement != (ast as any).__parent.__parent.__parent.type))) {
                 str += ': ' + this.codeFromAST(ast.typeAnnotation);

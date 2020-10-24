@@ -42,6 +42,7 @@ var FunctionInfo = /** @class */ (function (_super) {
         var _this = _super !== null && _super.apply(this, arguments) || this;
         _this.params = [];
         _this.localVars = [];
+        _this.anoymousFuncCnt = 0;
         return _this;
     }
     FunctionInfo.prototype.toString = function () {
@@ -100,11 +101,29 @@ var TsAnalysor = /** @class */ (function () {
     };
     TsAnalysor.prototype.processAST = function (ast) {
         switch (ast.type) {
+            case typescript_estree_1.AST_NODE_TYPES.ArrayExpression:
+                this.processArrayExpression(ast);
+                break;
+            case typescript_estree_1.AST_NODE_TYPES.ArrayPattern:
+                this.processArrayPattern(ast);
+                break;
+            case typescript_estree_1.AST_NODE_TYPES.ArrowFunctionExpression:
+                this.processArrowFunctionExpression(ast);
+                break;
+            case typescript_estree_1.AST_NODE_TYPES.AssignmentExpression:
+                this.processAssignmentExpression(ast);
+                break;
             case typescript_estree_1.AST_NODE_TYPES.AssignmentPattern:
                 this.processAssignmentPattern(ast);
                 break;
+            case typescript_estree_1.AST_NODE_TYPES.BinaryExpression:
+                this.processBinaryExpression(ast);
+                break;
             case typescript_estree_1.AST_NODE_TYPES.BlockStatement:
                 this.processBlockStatement(ast);
+                break;
+            case typescript_estree_1.AST_NODE_TYPES.CallExpression:
+                this.processCallExpression(ast);
                 break;
             case typescript_estree_1.AST_NODE_TYPES.ClassBody:
                 this.processClassBody(ast);
@@ -118,11 +137,23 @@ var TsAnalysor = /** @class */ (function () {
             case typescript_estree_1.AST_NODE_TYPES.ClassProperty:
                 this.processClassProperty(ast);
                 break;
+            case typescript_estree_1.AST_NODE_TYPES.ConditionalExpression:
+                this.processConditionalExpression(ast);
+                break;
             case typescript_estree_1.AST_NODE_TYPES.ExportNamedDeclaration:
                 this.processExportNamedDeclaration(ast);
                 break;
             case typescript_estree_1.AST_NODE_TYPES.ExpressionStatement:
                 this.processExpressionStatement(ast);
+                break;
+            case typescript_estree_1.AST_NODE_TYPES.ForInStatement:
+                this.processForInStatement(ast);
+                break;
+            case typescript_estree_1.AST_NODE_TYPES.ForOfStatement:
+                this.processForOfStatement(ast);
+                break;
+            case typescript_estree_1.AST_NODE_TYPES.ForStatement:
+                this.processForStatement(ast);
                 break;
             case typescript_estree_1.AST_NODE_TYPES.FunctionDeclaration:
                 this.processFunctionDeclaration(ast);
@@ -133,11 +164,68 @@ var TsAnalysor = /** @class */ (function () {
             case typescript_estree_1.AST_NODE_TYPES.Identifier:
                 this.processIdentifier(ast);
                 break;
+            case typescript_estree_1.AST_NODE_TYPES.IfStatement:
+                this.processIfStatement(ast);
+                break;
+            case typescript_estree_1.AST_NODE_TYPES.LogicalExpression:
+                this.processLogicalExpression(ast);
+                break;
+            case typescript_estree_1.AST_NODE_TYPES.MemberExpression:
+                this.processMemberExpression(ast);
+                break;
             case typescript_estree_1.AST_NODE_TYPES.MethodDefinition:
                 this.processMethodDefinition(ast);
                 break;
+            case typescript_estree_1.AST_NODE_TYPES.NewExpression:
+                this.processNewExpression(ast);
+                break;
+            case typescript_estree_1.AST_NODE_TYPES.ObjectExpression:
+                this.processObjectExpression(ast);
+                break;
+            case typescript_estree_1.AST_NODE_TYPES.ObjectPattern:
+                this.processObjectPattern(ast);
+                break;
             case typescript_estree_1.AST_NODE_TYPES.Program:
                 this.processProgram(ast);
+                break;
+            case typescript_estree_1.AST_NODE_TYPES.Property:
+                this.processProperty(ast);
+                break;
+            case typescript_estree_1.AST_NODE_TYPES.ReturnStatement:
+                this.processReturnStatement(ast);
+                break;
+            case typescript_estree_1.AST_NODE_TYPES.SequenceExpression:
+                this.processSequenceExpression(ast);
+                break;
+            case typescript_estree_1.AST_NODE_TYPES.SwitchCase:
+                this.processSwitchCase(ast);
+                break;
+            case typescript_estree_1.AST_NODE_TYPES.SwitchStatement:
+                this.processSwitchStatement(ast);
+                break;
+            case typescript_estree_1.AST_NODE_TYPES.ThrowStatement:
+                this.processThrowStatement(ast);
+                break;
+            case typescript_estree_1.AST_NODE_TYPES.TryStatement:
+                this.processTryStatement(ast);
+                break;
+            case typescript_estree_1.AST_NODE_TYPES.UnaryExpression:
+                this.processUnaryExpression(ast);
+                break;
+            case typescript_estree_1.AST_NODE_TYPES.UpdateExpression:
+                this.processUpdateExpression(ast);
+                break;
+            case typescript_estree_1.AST_NODE_TYPES.VariableDeclaration:
+                this.processVariableDeclaration(ast);
+                break;
+            case typescript_estree_1.AST_NODE_TYPES.VariableDeclarator:
+                this.processVariableDeclarator(ast);
+                break;
+            case typescript_estree_1.AST_NODE_TYPES.WhileStatement:
+                this.processWhileStatement(ast);
+                break;
+            case typescript_estree_1.AST_NODE_TYPES.TSInterfaceBody:
+                this.processTSInterfaceBody(ast);
                 break;
             case typescript_estree_1.AST_NODE_TYPES.TSAbstractMethodDefinition:
                 this.processTSAbstractMethodDefinition(ast);
@@ -155,15 +243,49 @@ var TsAnalysor = /** @class */ (function () {
                 break;
         }
     };
+    TsAnalysor.prototype.processArrayExpression = function (ast) {
+        for (var i = 0, len = ast.elements.length; i < len; i++) {
+            this.processAST(ast.elements[i]);
+        }
+    };
+    TsAnalysor.prototype.processArrayPattern = function (ast) {
+        this.assert(false, ast, 'Not support ArrayPattern yet!');
+    };
+    TsAnalysor.prototype.processArrowFunctionExpression = function (ast) {
+        if (ast.params) {
+            for (var i = 0, len = ast.params.length; i < len; i++) {
+                var oneParam = ast.params[i];
+                this.processAST(oneParam);
+            }
+        }
+        if (ast.body) {
+            this.processAST(ast.body);
+        }
+        this.assert(!ast.generator, ast, 'Not support generator yet!');
+        this.assert(!ast.async, ast, 'Not support async yet!');
+        this.assert(!ast.expression, ast, 'Not support expression yet!');
+    };
+    TsAnalysor.prototype.processAssignmentExpression = function (ast) {
+        this.processBinaryExpression(ast);
+    };
     TsAnalysor.prototype.processAssignmentPattern = function (ast) {
         if (ast.__isFuncParam)
             ast.left.__isFuncParam = true;
         this.processAST(ast.left);
     };
+    TsAnalysor.prototype.processBinaryExpression = function (ast) {
+        this.processAST(ast.right);
+    };
     TsAnalysor.prototype.processBlockStatement = function (ast) {
         for (var i = 0, len = ast.body.length; i < len; i++) {
             var bodyEle = ast.body[i];
             this.processAST(bodyEle);
+        }
+    };
+    TsAnalysor.prototype.processCallExpression = function (ast) {
+        for (var i = 0, len = ast.arguments.length; i < len; i++) {
+            var arg = ast.arguments[i];
+            this.processAST(arg);
         }
     };
     TsAnalysor.prototype.processClassBody = function (ast) {
@@ -209,11 +331,32 @@ var TsAnalysor = /** @class */ (function () {
             this.crtClass.propertyMap[propertyName] = propertyInfo;
         }
     };
+    TsAnalysor.prototype.processConditionalExpression = function (ast) {
+        this.processAST(ast.test);
+        this.processAST(ast.consequent);
+        this.processAST(ast.alternate);
+    };
     TsAnalysor.prototype.processExportNamedDeclaration = function (ast) {
         this.processAST(ast.declaration);
     };
     TsAnalysor.prototype.processExpressionStatement = function (ast) {
         this.processAST(ast.expression);
+    };
+    TsAnalysor.prototype.processForInStatement = function (ast) {
+        this.processAST(ast.left);
+        this.processAST(ast.right);
+        this.processAST(ast.body);
+    };
+    TsAnalysor.prototype.processForOfStatement = function (ast) {
+        this.processAST(ast.left);
+        this.processAST(ast.right);
+        this.processAST(ast.body);
+    };
+    TsAnalysor.prototype.processForStatement = function (ast) {
+        this.processAST(ast.init);
+        this.processAST(ast.test);
+        this.processAST(ast.update);
+        this.processAST(ast.body);
     };
     TsAnalysor.prototype.processFunctionDeclaration = function (ast) {
         this.processFunctionExpression(ast);
@@ -225,18 +368,27 @@ var TsAnalysor = /** @class */ (function () {
         if (!funcName && ast.id) {
             funcName = this.codeFromAST(ast.id);
         }
-        if (!funcName) {
-            funcName = 'function';
-        }
         if (this.crtClass) {
             if (funcName == this.crtClass.name)
                 funcName = 'constructor';
-            this.crtFunc = new FunctionInfo();
-            this.crtFunc.name = funcName;
-            this.crtFunc.accessibility = accessibility;
-            this.crtFunc.static = isStatic;
-            this.crtFunc.className = this.crtClass.name;
-            this.crtClass.functionMap[funcName] = this.crtFunc;
+            var funcInfo = new FunctionInfo();
+            funcInfo.anoymousFuncCnt = 0;
+            funcInfo.accessibility = accessibility;
+            funcInfo.static = isStatic;
+            funcInfo.className = this.crtClass.name;
+            if (this.crtFunc) {
+                // 这是一个匿名函数
+                this.assert(!funcName, ast, 'It should be an anoymous function!');
+                this.crtFunc.anoymousFuncCnt++;
+                funcInfo.name = this.crtFunc.name + '~' + this.crtFunc.anoymousFuncCnt;
+                funcInfo.parentFunc = this.crtFunc;
+            }
+            else {
+                funcInfo.name = funcName;
+                funcInfo.parentFunc = null;
+            }
+            this.crtClass.functionMap[funcInfo.name] = funcInfo;
+            this.crtFunc = funcInfo;
         }
         if (ast.params) {
             for (var i = 0, len = ast.params.length; i < len; i++) {
@@ -246,13 +398,30 @@ var TsAnalysor = /** @class */ (function () {
                 this.processAST(oneParam);
             }
         }
-        this.crtFunc = null;
+        if (ast.body)
+            this.processAST(ast.body);
+        this.crtFunc = this.crtFunc.parentFunc;
     };
     TsAnalysor.prototype.processIdentifier = function (ast) {
         var str = ast.name;
         if (ast.__isFuncParam && this.crtFunc) {
             this.crtFunc.params.push(str);
         }
+    };
+    TsAnalysor.prototype.processIfStatement = function (ast) {
+        this.processAST(ast.test);
+        this.processAST(ast.consequent);
+        if (ast.alternate && (ast.alternate.type != typescript_estree_1.AST_NODE_TYPES.BlockStatement || ast.alternate.body.length > 0)) {
+            this.processAST(ast.alternate);
+        }
+    };
+    TsAnalysor.prototype.processLogicalExpression = function (ast) {
+        this.processAST(ast.left);
+        this.processAST(ast.right);
+    };
+    TsAnalysor.prototype.processMemberExpression = function (ast) {
+        this.processAST(ast.object);
+        this.processAST(ast.property);
     };
     TsAnalysor.prototype.processMethodDefinition = function (ast) {
         var funcName = null;
@@ -261,10 +430,93 @@ var TsAnalysor = /** @class */ (function () {
         }
         this.processFunctionExpressionInternal(funcName, ast.static, ast.kind, ast.accessibility, ast.value);
     };
+    TsAnalysor.prototype.processNewExpression = function (ast) {
+        this.processAST(ast.callee);
+        for (var i = 0, len = ast.arguments.length; i < len; i++) {
+            this.processAST(ast.arguments[i]);
+        }
+    };
+    TsAnalysor.prototype.processObjectExpression = function (ast) {
+        for (var i = 0, len = ast.properties.length; i < len; i++) {
+            this.processAST(ast.properties[i]);
+        }
+    };
+    TsAnalysor.prototype.processObjectPattern = function (ast) {
+        this.assert(false, ast, 'Not support ObjectPattern yet!');
+    };
     TsAnalysor.prototype.processProgram = function (ast) {
         for (var i = 0, len = ast.body.length; i < len; i++) {
             var stm = ast.body[i];
             this.processAST(stm);
+        }
+    };
+    TsAnalysor.prototype.processProperty = function (ast) {
+        this.processAST(ast.key);
+        this.processAST(ast.value);
+    };
+    TsAnalysor.prototype.processReturnStatement = function (ast) {
+        if (ast.argument) {
+            this.processAST(ast.argument);
+        }
+    };
+    TsAnalysor.prototype.processSequenceExpression = function (ast) {
+        for (var i = 0, len = ast.expressions.length; i < len; i++) {
+            this.processAST(ast.expressions[i]);
+        }
+    };
+    TsAnalysor.prototype.processSwitchCase = function (ast) {
+        if (ast.test) {
+            this.processAST(ast.test);
+        }
+        for (var i = 0, len = ast.consequent.length; i < len; i++) {
+            if (ast.consequent[i].type != typescript_estree_1.AST_NODE_TYPES.BreakStatement) {
+                this.processAST(ast.consequent[i]);
+            }
+        }
+    };
+    TsAnalysor.prototype.processSwitchStatement = function (ast) {
+        this.processAST(ast.discriminant);
+        for (var i = 0, len = ast.cases.length; i < len; i++) {
+            this.processSwitchCase(ast.cases[i]);
+        }
+    };
+    TsAnalysor.prototype.processThrowStatement = function (ast) {
+        this.processAST(ast.argument);
+    };
+    TsAnalysor.prototype.processTryStatement = function (ast) {
+        this.processAST(ast.block);
+        if (ast.handler) {
+            this.processAST(ast.handler);
+        }
+        if (ast.finalizer) {
+            this.processAST(ast.finalizer);
+        }
+    };
+    TsAnalysor.prototype.processUnaryExpression = function (ast) {
+        this.processAST(ast.argument);
+    };
+    TsAnalysor.prototype.processUpdateExpression = function (ast) {
+        this.processAST(ast.argument);
+    };
+    TsAnalysor.prototype.processVariableDeclaration = function (ast) {
+        for (var i = 0, len = ast.declarations.length; i < len; i++) {
+            var d = ast.declarations[i];
+            this.processVariableDeclarator(d);
+        }
+    };
+    TsAnalysor.prototype.processVariableDeclarator = function (ast) {
+        this.processAST(ast.id);
+        if (ast.init) {
+            this.processAST(ast.init);
+        }
+    };
+    TsAnalysor.prototype.processWhileStatement = function (ast) {
+        this.processAST(ast.test);
+        this.processAST(ast.body);
+    };
+    TsAnalysor.prototype.processTSInterfaceBody = function (ast) {
+        for (var i = 0, len = ast.body.length; i < len; i++) {
+            this.codeFromAST(ast.body[i]);
         }
     };
     TsAnalysor.prototype.processTSAbstractMethodDefinition = function (ast) {
