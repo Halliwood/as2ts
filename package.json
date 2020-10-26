@@ -1,6 +1,6 @@
 {
   "name": "as2ts-smart",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "description": "An useful tool to translate actionscript code to typescript.",
   "main": "bin/index.js",
   "scripts": {
