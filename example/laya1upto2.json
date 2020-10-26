@@ -4,6 +4,7 @@
     }, 
     "idReplacement": {
         "Laya.Component": "Laya.UIComponent", 
+        "laya.ui.Component": "Laya.UIComponent", 
         "Laya.RaycastHit": "Laya.HitResult", 
         "Laya.StandardMaterial": "Laya.BlinnPhongMaterial"
     }, 
