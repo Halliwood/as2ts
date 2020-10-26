@@ -1,4 +1,4 @@
-import { Accessibility, ArrayExpression, ArrayPattern, ArrowFunctionExpression, AssignmentExpression, AssignmentPattern, AwaitExpression, BigIntLiteral, BinaryExpression, BlockStatement, BreakStatement, CallExpression, CatchClause, ClassBody, ClassDeclaration, ClassExpression, ClassProperty, ConditionalExpression, ContinueStatement, DebuggerStatement, Decorator, DoWhileStatement, EmptyStatement, ExportAllDeclaration, ExportDefaultDeclaration, ExportNamedDeclaration, ExportSpecifier, ExpressionStatement, ForInStatement, ForOfStatement, ForStatement, FunctionDeclaration, FunctionExpression, Identifier, IfStatement, ImportDeclaration, ImportDefaultSpecifier, ImportNamespaceSpecifier, ImportSpecifier, LabeledStatement, Literal, LogicalExpression, MemberExpression, MetaProperty, MethodDefinition, NewExpression, ObjectExpression, ObjectPattern, Program, Property, RestElement, ReturnStatement, SequenceExpression, SpreadElement, Super, SwitchCase, SwitchStatement, TaggedTemplateExpression, TemplateElement, TemplateLiteral, ThisExpression, ThrowStatement, TryStatement, UnaryExpression, UpdateExpression, VariableDeclaration, VariableDeclarator, WhileStatement, WithStatement, YieldExpression, TSEnumDeclaration, BindingName, TSAsExpression, TSClassImplements, TSInterfaceDeclaration, TSTypeAssertion, TSModuleDeclaration, TSModuleBlock, TSDeclareFunction, TSAbstractMethodDefinition, TSInterfaceBody, TSMethodSignature, TSTypeAnnotation, TSTypeParameterInstantiation, TSTypeReference, TSVoidKeyword, BaseNode } from '@typescript-eslint/types/dist/ts-estree';
+import { Accessibility, ArrayExpression, ArrayPattern, ArrowFunctionExpression, AssignmentExpression, AssignmentPattern, AwaitExpression, BigIntLiteral, BinaryExpression, BlockStatement, BreakStatement, CallExpression, CatchClause, ClassBody, ClassDeclaration, ClassExpression, ClassProperty, ConditionalExpression, ContinueStatement, DebuggerStatement, Decorator, DoWhileStatement, EmptyStatement, EntityName, ExportAllDeclaration, ExportDefaultDeclaration, ExportNamedDeclaration, ExportSpecifier, ExpressionStatement, ForInStatement, ForOfStatement, ForStatement, FunctionDeclaration, FunctionExpression, Identifier, IfStatement, ImportDeclaration, ImportDefaultSpecifier, ImportNamespaceSpecifier, ImportSpecifier, LabeledStatement, Literal, LogicalExpression, MemberExpression, MetaProperty, MethodDefinition, NewExpression, ObjectExpression, ObjectPattern, Program, Property, RestElement, ReturnStatement, SequenceExpression, SpreadElement, Super, SwitchCase, SwitchStatement, TaggedTemplateExpression, TemplateElement, TemplateLiteral, ThisExpression, ThrowStatement, TryStatement, UnaryExpression, UpdateExpression, VariableDeclaration, VariableDeclarator, WhileStatement, WithStatement, YieldExpression, TSEnumDeclaration, BindingName, TSAsExpression, TSClassImplements, TSInterfaceDeclaration, TSTypeAssertion, TSModuleDeclaration, TSModuleBlock, TSDeclareFunction, TSAbstractMethodDefinition, TSInterfaceBody, TSImportEqualsDeclaration, TSMethodSignature, TSQualifiedName, TSTypeAnnotation, TSTypeParameterInstantiation, TSTypeReference, TSVoidKeyword, BaseNode } from '@typescript-eslint/types/dist/ts-estree';
 import { AST_NODE_TYPES } from '@typescript-eslint/typescript-estree';
 import util = require('util');
 import path = require('path');
@@ -39,6 +39,7 @@ export class FunctionInfo extends PropertyInfo {
 export class ClassInfo {
     name: string;
     superClass: string;
+    superClassFullName: string;
     module: string;
     declare: boolean;
     propertyMap: {[name: string]: PropertyInfo} = {};
@@ -52,7 +53,10 @@ export class ClassInfo {
     }
 
     toString(): string {
-        let str = this.module + '.' + this.name;
+        let str = this.fullName;
+        if(this.superClass) {
+            str += '<' + this.superClassFullName;
+        }
         for(let propertyName in this.propertyMap) {
             str += '|' + this.propertyMap[propertyName];
         }
@@ -67,31 +71,32 @@ export class TsAnalysor {
     // 选项
     private option: As2TsOption;
 
-    public classMap: {[name: string]: ClassInfo} = {};
+    public classFullNameMap: {[fullName: string]: ClassInfo} = {};
+    public classNameMap: {[name: string]: ClassInfo} = {};
     private crtModule: string;
     private crtClass: ClassInfo;
     private crtFunc: FunctionInfo;
 
     private fullPath: string;
+    private dirname: string;
     private relativePath: string;
-    private module: string;
+    private fileModule: string;
+    private importedMap: {[key: string]: string};
 
     constructor(option: As2TsOption) {
         this.option = option || {};
     }
 
-    collect(ast: any, fullPath: string, relativePath?: string) {
-        this.fullPath = fullPath;
-        this.relativePath = relativePath;
-        if(relativePath) {
-            let modulePath = relativePath.replace(/\\/g, '/');
-            let pos = modulePath.lastIndexOf('/');
-            if(pos >= 0) {
-                this.module = modulePath.substring(0, pos + 1);
-            } else {
-                this.module = '';
-            }
+    collect(ast: any, inputFolder: string, filePath: string) {
+        this.fullPath = filePath;
+        this.relativePath = path.relative(inputFolder, filePath);
+        this.dirname = path.dirname(filePath);
+        if(filePath.match(/\.d\.ts$/)) {
+            this.fileModule = '';
+        } else {
+            this.fileModule = path.relative(inputFolder, this.dirname).replace(/\\+/g, '.').replace(/\.$/, '');
         }
+        this.importedMap = {};
         this.processAST(ast);
     }
 
@@ -185,6 +190,10 @@ export class TsAnalysor {
                 this.processIfStatement(ast);
                 break;
 
+            case AST_NODE_TYPES.ImportDeclaration:
+                this.processImportDeclaration(ast);
+                break;
+
             case AST_NODE_TYPES.LogicalExpression:
                 this.processLogicalExpression(ast);
                 break;
@@ -276,6 +285,10 @@ export class TsAnalysor {
             case AST_NODE_TYPES.TSModuleDeclaration:
                 this.processTSModuleDeclaration(ast);
                 break;
+            
+            case AST_NODE_TYPES.TSImportEqualsDeclaration:
+                this.processTSImportEqualsDeclaration(ast);
+                break;
 
             case AST_NODE_TYPES.TSInterfaceDeclaration:
                 this.processTSInterfaceDeclaration(ast);
@@ -359,13 +372,26 @@ export class TsAnalysor {
         this.crtClass = new ClassInfo();
         this.crtClass.declare = ast.declare;
         this.crtClass.name = className;
-        this.crtClass.module = this.crtModule || this.module;
+        this.crtClass.module = this.crtModule || this.fileModule;
         this.crtClass.anoymousFuncCnt = 0;
-        this.classMap[className] = this.crtClass;
-        if(this.crtClass.module) {
-            this.classMap[this.crtClass.fullName] = this.crtClass;
+        this.classNameMap[this.crtClass.name] = this.crtClass;
+        this.classFullNameMap[this.crtClass.fullName] = this.crtClass;
+        if(ast.superClass) {
+            this.crtClass.superClass = this.codeFromAST(ast.superClass);
+            if(this.crtClass.superClass.indexOf('.') > 0) {
+                this.crtClass.superClassFullName = this.crtClass.superClass;
+            } else {
+                let superModule = this.fileModule;
+                if(this.crtClass.superClass in this.importedMap) {
+                    superModule = this.importedMap[this.crtClass.superClass];
+                }
+                if(superModule) {
+                    this.crtClass.superClassFullName = superModule + '.' + this.crtClass.superClass;
+                } else {
+                    this.crtClass.superClassFullName = this.crtClass.superClass;
+                }
+            }
         }
-        if(ast.superClass) this.crtClass.superClass = this.codeFromAST(ast.superClass);
         
         this.processClassBody(ast.body);
         this.crtClass = null;
@@ -491,6 +517,23 @@ export class TsAnalysor {
         this.processAST(ast.consequent);
         if (ast.alternate && (ast.alternate.type != AST_NODE_TYPES.BlockStatement || (ast.alternate as BlockStatement).body.length > 0)) {
             this.processAST(ast.alternate);
+        }
+    }
+
+    private processImportDeclaration(ast: ImportDeclaration) {
+        let sourceValue = ast.source.value as string;
+        let dotPos = sourceValue.lastIndexOf('/');
+        let idStr = sourceValue;
+        let importModule = '';
+        if(dotPos > 0) {
+            idStr = sourceValue.substr(dotPos + 1);
+            importModule = sourceValue.substring(0, dotPos);
+        }
+
+        for(let i = 0, len = ast.specifiers.length; i < len; i++) {
+            let ss = this.codeFromAST(ast.specifiers[i]);
+            if(ss in this.importedMap) continue;
+            this.importedMap[ss] = importModule.replace(/\//g, '.');
         }
     }
 
@@ -631,24 +674,35 @@ export class TsAnalysor {
 
     private processTSModuleDeclaration(ast: TSModuleDeclaration) {
         let mid = this.codeFromAST(ast.id);
-        if(this.crtModule) {
-            this.crtModule += '.' + mid;
+        if('_EMPTYMODULE_' == mid) {
+            this.crtModule = '';
         } else {
-            this.crtModule = mid;
+            if(this.crtModule) {
+                this.crtModule += '.' + mid;
+            } else {
+                this.crtModule = mid;
+            }
         }
         this.processAST(ast.body);
+    }
+
+    private processTSImportEqualsDeclaration(ast: TSImportEqualsDeclaration) {
+        let idStr = this.codeFromAST(ast.id);
+        let refRstr = this.codeFromAST((ast.moduleReference as TSQualifiedName).right); 
+        if(idStr == refRstr) {
+            let refLStr = this.codeFromAST((ast.moduleReference as TSQualifiedName).left);
+            this.importedMap[idStr] = refLStr;
+        }
     }
 
     private processTSInterfaceDeclaration(ast: TSInterfaceDeclaration) {
         let className = this.codeFromAST(ast.id);
         this.crtClass = new ClassInfo();
         this.crtClass.name = className;
-        this.crtClass.module = this.crtModule || this.module;
+        this.crtClass.module = this.crtModule || this.fileModule;
         this.crtClass.anoymousFuncCnt = 0;
-        this.classMap[className] = this.crtClass;
-        if(this.crtClass.module) {
-            this.classMap[this.crtClass.fullName] = this.crtClass;
-        }
+        this.classNameMap[this.crtClass.name] = this.crtClass;
+        this.classFullNameMap[this.crtClass.fullName] = this.crtClass;
     }
 
     private codeFromAST(ast: any): string {
@@ -657,9 +711,17 @@ export class TsAnalysor {
             case AST_NODE_TYPES.Identifier:
                 str += this.codeFromIdentifier(ast);
                 break;
+            
+            case AST_NODE_TYPES.ImportSpecifier:
+                str += this.codeFromImportSpecifier(ast);
+                break;
 
             case AST_NODE_TYPES.MemberExpression:
                 str += this.codeFromMemberExpression(ast);
+                break;
+
+            case AST_NODE_TYPES.TSQualifiedName:
+                str += this.codeFromTSQualifiedName(ast);
                 break;
             
             default:
@@ -673,6 +735,11 @@ export class TsAnalysor {
         return ast.name;
     }
 
+    private codeFromImportSpecifier(ast: ImportSpecifier): string {
+        let str = this.codeFromAST(ast.imported);
+        return str;
+    }
+
     private codeFromMemberExpression(ast: MemberExpression): string {
         let objStr = this.codeFromAST(ast.object);
         let str = objStr;
@@ -683,6 +750,10 @@ export class TsAnalysor {
             str += '.' + propertyStr;
         }
         return str;
+    }
+
+    private codeFromTSQualifiedName(ast: TSQualifiedName) {
+        ast.left
     }
   
     private assert(cond: boolean, ast: BaseNode, message: string = null) {
@@ -700,8 +771,8 @@ export class TsAnalysor {
 
     toString(): string {
         let str = '';
-        for(let className in this.classMap) {
-            str += this.classMap[className].toString() + '\n';
+        for(let fullName in this.classFullNameMap) {
+            str += this.classFullNameMap[fullName].toString() + '\n';
         }
         return str;
     }

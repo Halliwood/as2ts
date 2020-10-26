@@ -15,6 +15,7 @@ var TsMaker = /** @class */ (function () {
         this.parentNoThis = [typescript_estree_1.AST_NODE_TYPES.Property, typescript_estree_1.AST_NODE_TYPES.VariableDeclarator];
         this.noSemecolonTypes = [typescript_estree_1.AST_NODE_TYPES.WhileStatement, typescript_estree_1.AST_NODE_TYPES.DoWhileStatement, typescript_estree_1.AST_NODE_TYPES.ForInStatement, typescript_estree_1.AST_NODE_TYPES.ForOfStatement,
             typescript_estree_1.AST_NODE_TYPES.ForStatement, typescript_estree_1.AST_NODE_TYPES.IfStatement, typescript_estree_1.AST_NODE_TYPES.SwitchStatement];
+        this.addThisFlag = '';
         this.analysor = analysor;
         this.option = option || {};
         this.setPriority(['( … )'], this.pv++);
@@ -129,14 +130,19 @@ var TsMaker = /** @class */ (function () {
         this.extraImports = [];
         this.inputFolder = inputFolder;
         this.filePath = filePath;
-        this.dirname = path.dirname(filePath);
         this.relativePath = path.relative(inputFolder, filePath);
+        this.dirname = path.dirname(filePath);
+        this.fileModule = path.relative(inputFolder, this.dirname).replace(/\\+/g, '.').replace(/\.$/, '');
         var str = this.codeFromAST(ast);
         var importStr = '';
         for (var i = 0, len = this.allTypes.length; i < len; i++) {
             var type = this.allTypes[i];
-            if (!this.importedMap[type] && !this.isSimpleType(type)) {
-                var classInfo = this.analysor.classMap[type];
+            if (!(type in this.importedMap) && !this.isSimpleType(type)) {
+                var typeFullname = type;
+                if (this.fileModule) {
+                    typeFullname = this.fileModule + '.' + type;
+                }
+                var classInfo = this.analysor.classFullNameMap[typeFullname];
                 if (classInfo && !classInfo.declare) {
                     if (this.option.noModule) {
                         var mstr = path.relative(this.dirname, path.join(inputFolder, classInfo.module.replace(/\.+/g, path.sep))).replace(/\\+/g, '/');
@@ -625,10 +631,14 @@ var TsMaker = /** @class */ (function () {
             this.assert(false, ast, 'Class name is necessary!');
         }
         var className = this.codeFromAST(ast.id);
-        this.importedMap[className] = true;
-        this.crtClass = this.analysor.classMap[className];
+        this.importedMap[className] = this.fileModule;
+        var fullname = className;
+        if (this.fileModule) {
+            fullname = this.fileModule + '.' + className;
+        }
+        this.crtClass = this.analysor.classFullNameMap[fullname];
+        this.assert(null != this.crtClass, ast, '[ERROR]Cannot find class info: ' + fullname);
         this.crtClass.anoymousFuncCnt = 0;
-        this.assert(null != this.crtClass, ast, '[ERROR]Cannot find class info: ' + className);
         var str = '';
         if (ast.__exported) {
             str += 'export ';
@@ -855,9 +865,7 @@ var TsMaker = /** @class */ (function () {
         }
         str += ' {\n';
         if (ast.body) {
-            if (!this.crtFunc.parentFunc) {
-                this.startAddThis = true;
-            }
+            this.startAddThis(funcName);
             var bodyStr = this.codeFromAST(ast.body);
             // 构造函数加上super
             if ('constructor' == funcName && this.crtClass.superClass && bodyStr.indexOf('super(') < 0) {
@@ -868,9 +876,7 @@ var TsMaker = /** @class */ (function () {
                     bodyStr = 'super();';
                 }
             }
-            if (!this.crtFunc.parentFunc) {
-                this.startAddThis = false;
-            }
+            this.stopAddThis(funcName);
             str += this.indent(bodyStr);
         }
         str += '\n}';
@@ -883,7 +889,7 @@ var TsMaker = /** @class */ (function () {
     };
     TsMaker.prototype.codeFromIdentifier = function (ast) {
         var str = ast.name;
-        if (this.startAddThis && null != this.crtClass) {
+        if (this.addThisFlag && null != this.crtClass) {
             var needThis = true;
             if (this.crtFunc) {
                 if (ast.__parent && ast.__parent.type == typescript_estree_1.AST_NODE_TYPES.VariableDeclarator) {
@@ -891,9 +897,10 @@ var TsMaker = /** @class */ (function () {
                     needThis = false;
                 }
             }
-            if (needThis && str != this.crtClass.name && (!ast.__parent || this.parentNoThis.indexOf(ast.__parent.type) < 0 && (ast.__parent.type != typescript_estree_1.AST_NODE_TYPES.MemberExpression || ast.__memberExp_is_object || ast.__memberExp_is_computed_property)) &&
+            if (needThis && str != this.crtClass.name && !(str in this.importedMap) &&
+                (!ast.__parent || this.parentNoThis.indexOf(ast.__parent.type) < 0 && (ast.__parent.type != typescript_estree_1.AST_NODE_TYPES.MemberExpression || ast.__memberExp_is_object || ast.__memberExp_is_computed_property)) &&
                 (!this.crtFunc || this.crtFunc.params.indexOf(str) < 0 && this.crtFunc.localVars.indexOf(str) < 0)) {
-                var minfo = this.getMemberInfo(this.crtClass, str);
+                var minfo = this.getMemberInfo(ast, this.crtClass, str);
                 if (minfo) {
                     if (minfo.static) {
                         str = minfo.className + '.' + str;
@@ -902,7 +909,7 @@ var TsMaker = /** @class */ (function () {
                         str = 'this.' + str;
                     }
                 }
-                else if (this.analysor.classMap[str]) {
+                else if (this.analysor.classNameMap[str]) {
                     var mapped = this.option.typeMapper[str];
                     if (mapped)
                         str = mapped;
@@ -955,22 +962,28 @@ var TsMaker = /** @class */ (function () {
     TsMaker.prototype.codeFromImportDeclaration = function (ast) {
         var str = 'import ';
         var specifierStr = '';
+        var sourceValue = ast.source.value;
+        var dotPos = sourceValue.lastIndexOf('/');
+        var idStr = sourceValue;
+        var importModule = '';
+        if (dotPos > 0) {
+            idStr = sourceValue.substr(dotPos + 1);
+            importModule = sourceValue.substring(0, dotPos);
+        }
         var cnt = 0;
         for (var i = 0, len = ast.specifiers.length; i < len; i++) {
             var ss = this.codeFromAST(ast.specifiers[i]);
-            if (this.importedMap[ss])
+            if (ss in this.importedMap)
                 continue;
             if (cnt > 0) {
                 specifierStr += ', ';
             }
             specifierStr += ss;
-            this.importedMap[ss] = true;
+            this.importedMap[ss] = importModule.replace(/\//g, '.');
             cnt++;
         }
         if (cnt == 0)
             return '';
-        var sourceStr;
-        var sourceValue = ast.source.value;
         var asModuleFormular;
         if (this.option.importRule && this.option.importRule.fromModule) {
             // 需要以模块形式导入
@@ -982,16 +995,10 @@ var TsMaker = /** @class */ (function () {
                 }
             }
         }
-        var dotPos = sourceValue.lastIndexOf('/');
-        var idStr = sourceValue;
-        if (dotPos > 0) {
-            idStr = sourceValue.substr(dotPos + 1);
-        }
         if (this.option.idReplacement && typeof (this.option.idReplacement[idStr]) === 'string') {
             idStr = this.option.idReplacement[idStr];
-            if (dotPos > 0) {
-                var preIdStr = sourceValue.substring(0, dotPos);
-                sourceValue = preIdStr + '/' + idStr;
+            if (importModule) {
+                sourceValue = importModule + '/' + idStr;
             }
         }
         if (asModuleFormular) {
@@ -1001,8 +1008,6 @@ var TsMaker = /** @class */ (function () {
                 this.extraImports.push(asModuleFormular);
             }
             return '';
-            // sourceStr = ' = ' + asModuleFormular.module + '.' + idStr;
-            // str += specifierStr + sourceStr + ';';
         }
         else {
             if (this.option.noModule) {
@@ -1017,7 +1022,7 @@ var TsMaker = /** @class */ (function () {
             else {
                 // specifierStr = '{' + specifierStr + '}';
                 // sourceStr = ' from ' + this.codeFromAST(ast.source);
-                sourceStr = ' = ' + sourceValue.replace(/\//g, '.');
+                var sourceStr = ' = ' + sourceValue.replace(/\//g, '.');
                 str += specifierStr + sourceStr + ';';
             }
         }
@@ -1152,10 +1157,11 @@ var TsMaker = /** @class */ (function () {
     };
     TsMaker.prototype.codeFromProperty = function (ast) {
         ast.key.__parent = ast;
-        var str = this.codeFromAST(ast.key) + ': ';
-        this.startAddThis = true;
+        var keyStr = this.codeFromAST(ast.key);
+        var str = keyStr + ': ';
+        this.startAddThis(keyStr);
         str += this.codeFromAST(ast.value);
-        this.startAddThis = false;
+        this.stopAddThis(keyStr);
         return str;
     };
     TsMaker.prototype.codeFromRestElement = function (ast) {
@@ -1511,6 +1517,15 @@ var TsMaker = /** @class */ (function () {
     TsMaker.prototype.codeFromTSVoidKeyword = function (ast) {
         return 'void';
     };
+    TsMaker.prototype.startAddThis = function (reason) {
+        this.addThisFlag += '.' + reason;
+    };
+    TsMaker.prototype.stopAddThis = function (reason) {
+        var r = '.' + reason;
+        if (this.addThisFlag.endsWith(r)) {
+            this.addThisFlag = this.addThisFlag.substr(0, this.addThisFlag.length - r.length);
+        }
+    };
     TsMaker.prototype.indent = function (str, fromLine) {
         if (fromLine === void 0) { fromLine = 0; }
         var indentStr = '    ';
@@ -1540,7 +1555,7 @@ var TsMaker = /** @class */ (function () {
         }
         return false;
     };
-    TsMaker.prototype.getMemberInfo = function (classInfo, pname) {
+    TsMaker.prototype.getMemberInfo = function (ast, classInfo, pname) {
         var finfo = classInfo.functionMap[pname];
         if (finfo)
             return finfo;
@@ -1548,7 +1563,12 @@ var TsMaker = /** @class */ (function () {
         if (pinfo)
             return pinfo;
         while (classInfo.superClass) {
-            classInfo = this.analysor.classMap[classInfo.superClass];
+            var superClassFullName = classInfo.superClassFullName;
+            if (this.option.idReplacement && typeof (this.option.idReplacement[superClassFullName]) == 'string') {
+                superClassFullName = this.option.idReplacement[superClassFullName];
+            }
+            classInfo = this.analysor.classFullNameMap[superClassFullName];
+            this.assert(null != classInfo, ast, 'Could not find super class info: ' + superClassFullName);
             if (classInfo) {
                 var finfo_1 = classInfo.functionMap[pname];
                 if (finfo_1 && finfo_1.accessibility != 'private') {
@@ -1568,10 +1588,10 @@ var TsMaker = /** @class */ (function () {
     TsMaker.prototype.assert = function (cond, ast, message) {
         if (message === void 0) { message = null; }
         if (!cond) {
-            if (this.option.errorDetail) {
+            if (ast && this.option.errorDetail) {
                 console.log(util.inspect(ast, true, 2));
             }
-            console.log('\x1B[36m%s\x1B[0m(tmp/tmp.ts:\x1B[33m%d:%d\x1B[0m) - \x1B[31merror\x1B[0m: %s', this.relativePath, ast.loc ? ast.loc.start.line : -1, ast.loc ? ast.loc.start.column : -1, message ? message : 'Error');
+            console.log('\x1B[36m%s\x1B[0m(tmp/tmp.ts:\x1B[33m%d:%d\x1B[0m) - \x1B[31merror\x1B[0m: %s', this.relativePath, ast && ast.loc ? ast.loc.start.line : -1, ast && ast.loc ? ast.loc.start.column : -1, message ? message : 'Error');
             console.log(Strings_1.As2TsHints.ContactMsg);
             if (this.option.terminateWhenError) {
                 throw new Error('[As2TS]Something wrong encountered.');

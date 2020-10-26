@@ -185,10 +185,10 @@ var Main = /** @class */ (function () {
                     fs.mkdirSync(tmpAstPP.dir, { recursive: true });
                 fs.writeFileSync(tmpAstPath, JSON.stringify(ast));
             }
-            this.tsAnalysor.collect(ast, filePath, relativePath);
+            this.tsAnalysor.collect(ast, this.inputFolder, filePath);
         }
         else {
-            // if(filePath.indexOf('WxRoot.as')<0) return;
+            // if(filePath.indexOf('TweenTarget.as')<0) return;
             var outFilePath = filePath.replace(this.inputFolder, this.outputFolder);
             var tsFilePath = outFilePath.replace(/\.as$/, '.ts');
             console.log('\x1B[1A\x1B[Kmaking: %s', tsFilePath);
@@ -221,7 +221,14 @@ var Main = /** @class */ (function () {
         var tsContent = fs.readFileSync(filePath, 'utf-8');
         // 分析语法树
         var ast = parser.parse(tsContent); //, {loc: true, range: true}
-        this.tsAnalysor.collect(ast, filePath);
+        if (this.transOption.tmpRoot) {
+            var tmpAstPath = this.tmpAstDir + path.parse(filePath).name + '.lib.json';
+            var tmpAstPP = path.parse(tmpAstPath);
+            if (!fs.existsSync(tmpAstPP.dir))
+                fs.mkdirSync(tmpAstPP.dir, { recursive: true });
+            fs.writeFileSync(tmpAstPath, JSON.stringify(ast));
+        }
+        this.tsAnalysor.collect(ast, this.inputFolder, filePath);
     };
     Main.prototype.dumpAnalysor = function () {
         var analysorInfoPath = this.transOption.tmpRoot + '/analysor.txt';

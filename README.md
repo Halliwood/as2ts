@@ -83,7 +83,8 @@ export interface As2TsOption {
 
 #### 配置例子
 
-如下是一个配置例子，请参见[rule.json](./example/rule.json)
+完整的配置例子，请参见[rule.json](./example/rule.json)
+将Laya 1.0+as升级到Laya 2.0+ts的配置例子，请参见[laya1upto2.json](./example/laya1upto2.json)
 
 #### skipRule
   此项用于在翻译时忽略部分文件，其格式定义如下，请参见[As2TsSkipRule](./typings/index.d.ts)
@@ -97,26 +98,31 @@ export interface As2TsSkipRule {
 }
 ```
 
-  比如，假设输入的as3项目目录为`asproj/src`，则下述规则表示不要翻译`asproj/src/ui/*`和`asproj/src/automatic**`目录下的文件，以及`MsgPool.as`等文件。
+  比如，假设输入的as3项目目录为`asproj/src`，则下述规则表示不要翻译`asproj/src/ui/*`和`asproj/src/automatic/*`目录下的文件，以及`MsgPool.as`等文件。
+  注意，如果使用正则表达式匹配，也要用字符串形式配置，如例子中的`"^\\bui\\b"`，相当于正则表达式`^\bui\b`。
+  小提示：`\b`用于匹配单词的边界，关于其详细用法请查找正则表达式资料，以下不详细解释。
 
 ```JSON
 "skipRule": {
-    "dirs": ["^\\bui\\b", "^\bautomatic\b"], 
-    "files": ["MsgPool.as", "FyMsg.as", "DecodeUtil.as", "EncodeUtil.as", "SendMsgUtil.as"]
+    "dirs": ["^\\bui\\b", "^automatic"], 
+    "files": ["FyMsg.as", "DecodeUtil.as", "EncodeUtil.as", "SendMsgUtil.as"]
 }
 ```
 
 #### idReplacement
-  此项用于在翻译时将某些标识符（包括变量名、类名、函数名等）进行替换。比如下述规则表示将`KW`替换为`KeyWord`。
+  此项用于在翻译时将某些标识符（包括变量名、类名、函数名等）进行替换。不支持正则表达式匹配。比如下述规则表示将`KW`替换为`KeyWord`等。
 
 ```JSON
 "idReplacement": {
-    "KW": "KeyWord"
+    "KW": "KeyWord", 
+    "Laya.Component": "Laya.UIComponent", 
+    "Laya.RaycastHit": "Laya.HitResult", 
+    "Laya.StandardMaterial": "Laya.BlinnPhongMaterial"
 }
 ```
 
 #### literalReplacement
-  此项用于在翻译时将某些字面量（包括数值、字符串等）进行替换。比如下述规则表示将字符串`automatic/constants/KW`替换为`automatic/constants/KeyWord`。
+  此项用于在翻译时将某些字面量（包括数值、字符串等）进行替换。不支持正则表达式匹配比如下述规则表示将字符串`automatic/constants/KW`替换为`automatic/constants/KeyWord`。
 
 ```JSON
 "literalReplacement": {
@@ -216,29 +222,34 @@ export class C extends B
 ```
 
 #### importRule
-  此项用于将AS的包按照指定的规则转换为TS的模块，其格式定义如下，请参见[As2TsImportRule](./typings/index.d.ts)。
+  此项用于将AS的包按照指定的规则以TS模块的形式进行导入，并去除原先的import语句。其格式定义如下，请参见[As2TsImportRule](./typings/index.d.ts)。
   
 ```TypeScript
+export interface FromModule {
+    /**导入的模块名 */
+    "module": string, 
+    /**匹配规则，支持正则表达式匹配 */
+    "regular": string, 
+    /**模块名需要另外import的路径*/
+    "import"?: string
+}
+
 export interface As2TsImportRule {
-    /**需要导出为模块的规则 */
-    "fromModule"?: {
-        /**导出的模块名 */
-        "module": string, 
-        /**匹配规则，支持正则表达式匹配 */
-        "regular": string
-    }[]
+    /**需要以模块形式进行import导入的规则 */
+    "fromModule"?: FromModule[]
 }
 ```
   
   下述例子的第一个配置即是对AS中的`laya.*`等进行翻译的应用。它将会把`laya.utils.Handler`和`laya.ui.Image`之类的翻译成`Laya.Handler`和`Laya.Image`。
+  对于某些需要import的模块，比如Laya2.0中ui类的使用，可以配置`import`项进行import。
 
 ```JSON
 "importRule": {
     "fromModule": [
-        {"module": "Laya", "regular": "^laya" }, 
-        {"module": "ui", "regular": "^ui/" }, 
         {"module": "Protocol", "regular": "^automatic/protocol/(?!Macros|ErrorId)" }, 
-        {"module": "GameConfig", "regular": "^automatic/cfgs" }
+        {"module": "GameConfig", "regular": "^automatic/cfgs/(?!ConfigDecoder)" }, 
+        {"module": "Laya", "regular": "^laya/" }, 
+        {"module": "ui", "regular": "^ui/", "import": "ui/layaMaxUI" }
     ]
 }
 ```
@@ -247,7 +258,7 @@ export interface As2TsImportRule {
   as2ts-smart在翻译时会通过分析AS代码得到类与类之间的继承关系，进而实现对AS中常见的this指针缺省现象进行智能添加。但有时候输入的AS项目中并不能提供最完整的信息，会导致as2ts-smart无法判定某些标识符是否需要添加this指针。比如，有些类型的是由第三方SDK定义的，这时你可以将第三方SDK的`.d.ts`文件配置于此项。比如，下述例子可以让as2ts-smart获得Laya SDK的相关信息。
 
 ```JSON
-"tsLibs": ["E:/qhgame/tsproj/src/ui/layaUI.max.all.ts"]
+"tsLibs": ["E:/qhgame/tsproj/libs/LayaAir.d.ts", "E:/qhgame/tsproj/libs/layaAir.minigame.d.ts", "E:/qhgame/tsproj/src/ui/layaMaxUI.ts"]
 ```
 
 #### errorDetail

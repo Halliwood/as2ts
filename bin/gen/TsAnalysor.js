@@ -16,6 +16,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.TsAnalysor = exports.ClassInfo = exports.FunctionInfo = exports.PropertyInfo = void 0;
 var typescript_estree_1 = require("@typescript-eslint/typescript-estree");
 var util = require("util");
+var path = require("path");
 var Strings_1 = require("./Strings");
 var PropertyInfo = /** @class */ (function () {
     function PropertyInfo() {
@@ -68,7 +69,10 @@ var ClassInfo = /** @class */ (function () {
         configurable: true
     });
     ClassInfo.prototype.toString = function () {
-        var str = this.module + '.' + this.name;
+        var str = this.fullName;
+        if (this.superClass) {
+            str += '<' + this.superClassFullName;
+        }
         for (var propertyName in this.propertyMap) {
             str += '|' + this.propertyMap[propertyName];
         }
@@ -82,22 +86,21 @@ var ClassInfo = /** @class */ (function () {
 exports.ClassInfo = ClassInfo;
 var TsAnalysor = /** @class */ (function () {
     function TsAnalysor(option) {
-        this.classMap = {};
+        this.classFullNameMap = {};
+        this.classNameMap = {};
         this.option = option || {};
     }
-    TsAnalysor.prototype.collect = function (ast, fullPath, relativePath) {
-        this.fullPath = fullPath;
-        this.relativePath = relativePath;
-        if (relativePath) {
-            var modulePath = relativePath.replace(/\\/g, '/');
-            var pos = modulePath.lastIndexOf('/');
-            if (pos >= 0) {
-                this.module = modulePath.substring(0, pos + 1);
-            }
-            else {
-                this.module = '';
-            }
+    TsAnalysor.prototype.collect = function (ast, inputFolder, filePath) {
+        this.fullPath = filePath;
+        this.relativePath = path.relative(inputFolder, filePath);
+        this.dirname = path.dirname(filePath);
+        if (filePath.match(/\.d\.ts$/)) {
+            this.fileModule = '';
         }
+        else {
+            this.fileModule = path.relative(inputFolder, this.dirname).replace(/\\+/g, '.').replace(/\.$/, '');
+        }
+        this.importedMap = {};
         this.processAST(ast);
     };
     TsAnalysor.prototype.processAST = function (ast) {
@@ -168,6 +171,9 @@ var TsAnalysor = /** @class */ (function () {
             case typescript_estree_1.AST_NODE_TYPES.IfStatement:
                 this.processIfStatement(ast);
                 break;
+            case typescript_estree_1.AST_NODE_TYPES.ImportDeclaration:
+                this.processImportDeclaration(ast);
+                break;
             case typescript_estree_1.AST_NODE_TYPES.LogicalExpression:
                 this.processLogicalExpression(ast);
                 break;
@@ -236,6 +242,9 @@ var TsAnalysor = /** @class */ (function () {
                 break;
             case typescript_estree_1.AST_NODE_TYPES.TSModuleDeclaration:
                 this.processTSModuleDeclaration(ast);
+                break;
+            case typescript_estree_1.AST_NODE_TYPES.TSImportEqualsDeclaration:
+                this.processTSImportEqualsDeclaration(ast);
                 break;
             case typescript_estree_1.AST_NODE_TYPES.TSInterfaceDeclaration:
                 this.processTSInterfaceDeclaration(ast);
@@ -309,14 +318,28 @@ var TsAnalysor = /** @class */ (function () {
         this.crtClass = new ClassInfo();
         this.crtClass.declare = ast.declare;
         this.crtClass.name = className;
-        this.crtClass.module = this.crtModule || this.module;
+        this.crtClass.module = this.crtModule || this.fileModule;
         this.crtClass.anoymousFuncCnt = 0;
-        this.classMap[className] = this.crtClass;
-        if (this.crtClass.module) {
-            this.classMap[this.crtClass.fullName] = this.crtClass;
-        }
-        if (ast.superClass)
+        this.classNameMap[this.crtClass.name] = this.crtClass;
+        this.classFullNameMap[this.crtClass.fullName] = this.crtClass;
+        if (ast.superClass) {
             this.crtClass.superClass = this.codeFromAST(ast.superClass);
+            if (this.crtClass.superClass.indexOf('.') > 0) {
+                this.crtClass.superClassFullName = this.crtClass.superClass;
+            }
+            else {
+                var superModule = this.fileModule;
+                if (this.crtClass.superClass in this.importedMap) {
+                    superModule = this.importedMap[this.crtClass.superClass];
+                }
+                if (superModule) {
+                    this.crtClass.superClassFullName = superModule + '.' + this.crtClass.superClass;
+                }
+                else {
+                    this.crtClass.superClassFullName = this.crtClass.superClass;
+                }
+            }
+        }
         this.processClassBody(ast.body);
         this.crtClass = null;
     };
@@ -430,6 +453,22 @@ var TsAnalysor = /** @class */ (function () {
         this.processAST(ast.consequent);
         if (ast.alternate && (ast.alternate.type != typescript_estree_1.AST_NODE_TYPES.BlockStatement || ast.alternate.body.length > 0)) {
             this.processAST(ast.alternate);
+        }
+    };
+    TsAnalysor.prototype.processImportDeclaration = function (ast) {
+        var sourceValue = ast.source.value;
+        var dotPos = sourceValue.lastIndexOf('/');
+        var idStr = sourceValue;
+        var importModule = '';
+        if (dotPos > 0) {
+            idStr = sourceValue.substr(dotPos + 1);
+            importModule = sourceValue.substring(0, dotPos);
+        }
+        for (var i = 0, len = ast.specifiers.length; i < len; i++) {
+            var ss = this.codeFromAST(ast.specifiers[i]);
+            if (ss in this.importedMap)
+                continue;
+            this.importedMap[ss] = importModule.replace(/\//g, '.');
         }
     };
     TsAnalysor.prototype.processLogicalExpression = function (ast) {
@@ -547,24 +586,35 @@ var TsAnalysor = /** @class */ (function () {
     };
     TsAnalysor.prototype.processTSModuleDeclaration = function (ast) {
         var mid = this.codeFromAST(ast.id);
-        if (this.crtModule) {
-            this.crtModule += '.' + mid;
+        if ('_EMPTYMODULE_' == mid) {
+            this.crtModule = '';
         }
         else {
-            this.crtModule = mid;
+            if (this.crtModule) {
+                this.crtModule += '.' + mid;
+            }
+            else {
+                this.crtModule = mid;
+            }
         }
         this.processAST(ast.body);
+    };
+    TsAnalysor.prototype.processTSImportEqualsDeclaration = function (ast) {
+        var idStr = this.codeFromAST(ast.id);
+        var refRstr = this.codeFromAST(ast.moduleReference.right);
+        if (idStr == refRstr) {
+            var refLStr = this.codeFromAST(ast.moduleReference.left);
+            this.importedMap[idStr] = refLStr;
+        }
     };
     TsAnalysor.prototype.processTSInterfaceDeclaration = function (ast) {
         var className = this.codeFromAST(ast.id);
         this.crtClass = new ClassInfo();
         this.crtClass.name = className;
-        this.crtClass.module = this.crtModule || this.module;
+        this.crtClass.module = this.crtModule || this.fileModule;
         this.crtClass.anoymousFuncCnt = 0;
-        this.classMap[className] = this.crtClass;
-        if (this.crtClass.module) {
-            this.classMap[this.crtClass.fullName] = this.crtClass;
-        }
+        this.classNameMap[this.crtClass.name] = this.crtClass;
+        this.classFullNameMap[this.crtClass.fullName] = this.crtClass;
     };
     TsAnalysor.prototype.codeFromAST = function (ast) {
         var str = '';
@@ -572,8 +622,14 @@ var TsAnalysor = /** @class */ (function () {
             case typescript_estree_1.AST_NODE_TYPES.Identifier:
                 str += this.codeFromIdentifier(ast);
                 break;
+            case typescript_estree_1.AST_NODE_TYPES.ImportSpecifier:
+                str += this.codeFromImportSpecifier(ast);
+                break;
             case typescript_estree_1.AST_NODE_TYPES.MemberExpression:
                 str += this.codeFromMemberExpression(ast);
+                break;
+            case typescript_estree_1.AST_NODE_TYPES.TSQualifiedName:
+                str += this.codeFromTSQualifiedName(ast);
                 break;
             default:
                 this.assert(false, ast, '[ERROR]Analyse ast error, not support: ' + ast.type);
@@ -583,6 +639,10 @@ var TsAnalysor = /** @class */ (function () {
     };
     TsAnalysor.prototype.codeFromIdentifier = function (ast) {
         return ast.name;
+    };
+    TsAnalysor.prototype.codeFromImportSpecifier = function (ast) {
+        var str = this.codeFromAST(ast.imported);
+        return str;
     };
     TsAnalysor.prototype.codeFromMemberExpression = function (ast) {
         var objStr = this.codeFromAST(ast.object);
@@ -595,6 +655,9 @@ var TsAnalysor = /** @class */ (function () {
             str += '.' + propertyStr;
         }
         return str;
+    };
+    TsAnalysor.prototype.codeFromTSQualifiedName = function (ast) {
+        ast.left;
     };
     TsAnalysor.prototype.assert = function (cond, ast, message) {
         if (message === void 0) { message = null; }
@@ -611,8 +674,8 @@ var TsAnalysor = /** @class */ (function () {
     };
     TsAnalysor.prototype.toString = function () {
         var str = '';
-        for (var className in this.classMap) {
-            str += this.classMap[className].toString() + '\n';
+        for (var fullName in this.classFullNameMap) {
+            str += this.classFullNameMap[fullName].toString() + '\n';
         }
         return str;
     };
