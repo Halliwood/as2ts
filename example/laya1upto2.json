@@ -15,7 +15,7 @@
         ]
     }, 
     "tsLibs": ["E:/qhgame/tsproj/libs/LayaAir.d.ts", "E:/qhgame/tsproj/libs/layaAir.minigame.d.ts", "E:/qhgame/tsproj/src/ui/layaMaxUI.ts"], 
-    "noModule": true, 
+    "module": false, 
     "errorDetail": true, 
     "terminateWhenError": true, 
     "continueLast": false, 

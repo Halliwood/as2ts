@@ -45,11 +45,12 @@ var Main = /** @class */ (function () {
     function Main() {
     }
     /**不支持内联函数、函数语句、单行声明多个成员变量 */
-    Main.prototype.translateFiles = function (inputPath, outputPath, ruleFilePath) {
+    Main.prototype.translateFiles = function (inputPath, outputPath, module, ruleFilePath) {
         var startAt = (new Date()).getTime();
         this.inputFolder = inputPath;
         this.outputFolder = outputPath;
         this.transOption = {};
+        this.transOption.module = module;
         if (ruleFilePath && fs.existsSync(ruleFilePath)) {
             var ruleSt = fs.statSync(ruleFilePath);
             if (ruleSt.isFile()) {

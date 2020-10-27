@@ -30,8 +30,8 @@ export interface As2TsOption {
     typeMapper?: {[key: string]: string}, 
     /**方法替换映射规则，不支持正则表达式匹配 */
     methordMapper?: {[key: string]: string}, 
-    /**是否不生成模块 */
-    noModule?: boolean, 
+    /**是否生成模块，默认为false */
+    module?: boolean, 
     /**模块导入规则 */
     importRule?: As2TsImportRule, 
     /**额外的typescript代码库，用于补充类库信息 */

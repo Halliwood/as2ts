@@ -43,6 +43,12 @@ as2ts-smart -s E:\\asproj\\src\\ --dist E:\\tsproj\\src\\ -r E:\\rule.json
 
 #### --dist
   必须。生成的TypeScript代码输出目录。
+
+#### -m, --module
+  可选。将ActionScript3.0的`package`翻译成`module`。
+
+#### -M, --no-module
+  可选（默认）。与-m相反。
   
 #### -r, --rule
   可选。翻译规则描述文件，as2ts-smart将根据该描述指定的规则进行翻译。
@@ -64,8 +70,8 @@ export interface As2TsOption {
     typeMapper?: {[key: string]: string}, 
     /**方法替换映射规则，不支持正则表达式匹配 */
     methordMapper?: {[key: string]: string}, 
-    /**是否不生成模块 */
-    noModule?: boolean, 
+    /**是否生成模块，默认为false */
+    module?: boolean, 
     /**模块导入规则 */
     importRule?: As2TsImportRule, 
     /**额外的typescript代码库，用于补充类库信息 */
@@ -155,8 +161,8 @@ export interface As2TsSkipRule {
 }
 ```
 
-#### noModule
-  默认情况下，as2ts-smart会将AS3中的`package xxx`翻译为`module xxx`，相应的，所有的`import a.b.C;`将会翻译为`import C = a.b.C;`。启用此项后，将去掉模块的声明。比如如下两个AS3类：
+#### module
+  此项用于指定是否将AS3中的`package xxx`翻译为`module xxx`，相应的，所有的`import a.b.C;`将会翻译为`import C = a.b.C;`。默认关闭。也可用参数`-m`/`--module`开启。比如如下两个AS3类：
 
 ```ActionScript 3.0
 // file a/B.as

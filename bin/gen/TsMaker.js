@@ -144,7 +144,7 @@ var TsMaker = /** @class */ (function () {
                 }
                 var classInfo = this.analysor.classFullNameMap[typeFullname];
                 if (classInfo && !classInfo.declare) {
-                    if (this.option.noModule) {
+                    if (!this.option.module) {
                         var mstr = path.relative(this.dirname, path.join(inputFolder, classInfo.module.replace(/\.+/g, path.sep))).replace(/\\+/g, '/');
                         if (!mstr) {
                             mstr = '.';
@@ -166,7 +166,7 @@ var TsMaker = /** @class */ (function () {
         }
         for (var i = 0, len = this.extraImports.length; i < len; i++) {
             var ei = this.extraImports[i];
-            if (this.option.noModule) {
+            if (!this.option.module) {
                 var mstr = path.relative(this.dirname, path.join(inputFolder, ei.import)).replace(/\\+/g, '/');
                 if (!mstr) {
                     mstr = '.';
@@ -181,7 +181,7 @@ var TsMaker = /** @class */ (function () {
                 importStr += 'import ' + ei.module + ' = ' + mstr + ';\n';
             }
         }
-        if (importStr && !this.option.noModule) {
+        if (importStr && this.option.module) {
             importStr = this.indent(importStr);
         }
         str = str.replace(this.TagAddImport, importStr);
@@ -1010,7 +1010,7 @@ var TsMaker = /** @class */ (function () {
             return '';
         }
         else {
-            if (this.option.noModule) {
+            if (!this.option.module) {
                 // 需要加上.ts指定为相对于引入文件的相对路径，否则当import的文件名和同名文件夹同时存在时，相对路径会不正确
                 // 比如import进来的是xxx/Plat.as，而同时存在xxx/plat文件夹
                 var rp = path.relative(this.dirname, path.join(this.inputFolder, sourceValue) + '.ts').replace(/\\/g, '/');
@@ -1445,7 +1445,7 @@ var TsMaker = /** @class */ (function () {
         var idStr = this.codeFromAST(ast.id);
         ast.body.__parent = ast;
         var bodyStr = this.codeFromAST(ast.body);
-        if (!this.option.noModule && idStr != '_EMPTYMODULE_') {
+        if (this.option.module && idStr != '_EMPTYMODULE_') {
             str += idStr;
             if (ast.body.type != typescript_estree_1.AST_NODE_TYPES.TSModuleDeclaration) {
                 str += ' {\n';

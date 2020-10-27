@@ -18,6 +18,8 @@ program
     .version(myPackage.version, "-v, --version")
     .option("-s, --src <path>", "[MUST] actionscript files path. both direction or single file.", getPath)
     .option("--dist [value]", "[MUST] outout typescript file path. both direction or single file.", getPath)
+    .option("-m --module", "make module.", false)
+    .option("-M --no-module", "don't make module.")
     .option("-r, --rule <path>", "translate rule json file.", getPath)
     .parse(process.argv);
 if (!program.src) {
@@ -29,4 +31,4 @@ if (!program.dist) {
     program.help();
 }
 var main = new Main_1.default();
-main.translateFiles(program.src, program.dist, program.rule);
+main.translateFiles(program.src, program.dist, program.module, program.rule);

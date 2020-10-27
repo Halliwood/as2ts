@@ -41,12 +41,13 @@ export default class Main {
     private hasMeetLast: boolean;
 
     /**不支持内联函数、函数语句、单行声明多个成员变量 */
-    translateFiles(inputPath: string, outputPath: string, ruleFilePath?: string) {
+    translateFiles(inputPath: string, outputPath: string, module: boolean, ruleFilePath?: string) {
         let startAt = (new Date()).getTime();
         this.inputFolder = inputPath;
         this.outputFolder = outputPath;
         
         this.transOption = {};
+        this.transOption.module = module;
         if(ruleFilePath && fs.existsSync(ruleFilePath)) {
             let ruleSt = fs.statSync(ruleFilePath);
             if(ruleSt.isFile()) {                    

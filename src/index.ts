@@ -16,6 +16,8 @@ program
 	.version(myPackage.version, "-v, --version")
 	.option("-s, --src <path>", "[MUST] actionscript files path. both direction or single file.", getPath)
 	.option("--dist [value]", "[MUST] outout typescript file path. both direction or single file.", getPath)
+	.option("-m --module", "make module.", false)
+	.option("-M --no-module", "don't make module.")
 	.option("-r, --rule <path>", "translate rule json file.", getPath)	
     .parse(process.argv);
 
@@ -29,4 +31,4 @@ if(!(<any>program).dist) {
 }
 
 let main = new Main();
-main.translateFiles((<any>program).src, (<any>program).dist, (<any>program).rule);
+main.translateFiles((<any>program).src, (<any>program).dist, (<any>program).module, (<any>program).rule);
