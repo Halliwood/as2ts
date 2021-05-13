@@ -4,10 +4,11 @@
   "description": "An useful tool to translate actionscript code to typescript.",
   "main": "bin/index.js",
   "scripts": {
-    "test": "tsc && node bin/index.js -s 'example\\test\\asproj\\src\\' --dist 'example\\test\\tsproj\\src\\'",
-    "local": "tsc && node bin/index.js -s 'E:\\qhgame\\trunk\\project\\src\\' --dist 'E:\\qhgame\\tsproj\\src\\' -r 'example\\rule.json'",
+    "test": "node bin/index.js -s 'example\\test\\asproj\\src\\' --dist 'example\\test\\tsproj\\src\\'",
+    "test2": "node bin/index.js -s 'example\\test2\\asproj\\src\\' --dist 'example\\test2\\tsproj\\src\\'",
+    "local": "node bin/index.js -s 'E:\\qhgame\\trunk\\project\\src\\' --dist 'E:\\qhgame\\tsproj\\src\\' -r 'example\\rule.json'",
     "build": "tsc",
-    "release": "tsc && npm config set registry=http://registry.npmjs.org && npm version patch && npm publish && npm config set registry=https://registry.npm.taobao.org/"
+    "release": "npm config set registry=http://registry.npmjs.org && npm version patch && npm publish"
   },
   "repository": {
     "type": "git",
