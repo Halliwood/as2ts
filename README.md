@@ -13,6 +13,9 @@
 
 * [nshen/as2ts](https://github.com/nshen/as2ts) - 只是简单的正则表达式替换，翻译后会有各种语法问题，无法解决`for each`/`for in`/`new Vector.<int>()`之类的翻译问题，也无法自动添加this指针和import。
 
+## 将Laya 1.0 as项目转换为Laya 2.0 ts项目
+  使用本工具可以一键转换Laya项目，这篇文章提供了操作步骤，请参考：[全网最好用的AS3转TS代码工具：as2ts-smart](https://www.jianshu.com/p/c25f1112f310)
+
 ## 使用环境
 
 Node.js
@@ -282,7 +285,7 @@ export interface As2TsImportRule {
 ## 已知问题
 
 ### 内联函数
-  暂不支持内联函数的翻译。如果AS代码中存在内联函数，可能导致转换时发生错误。请尽量避免使用类似下述的写法：
+  暂不支持内联函数的翻译。如果AS代码中存在内联函数，可能导致转换时发生错误（当然也有可能可以成功转换）。请尽量避免使用类似下述的写法：
 
 ```as3
 private function doSomething(): void {
@@ -290,6 +293,19 @@ private function doSomething(): void {
     doSomethingInner();
     // 不要使用此类内联函数
     function doSomethingInner(): void {
+        // ...
+    }
+}
+```
+
+### 某些不常规的写法
+  比如不常规的换行、拆行，也可能导致转换时失败，请根据失败提示修改一下写法。比如：
+
+```as3
+private function maybeFailed(sth: *): void {
+    // 以下写法把包括is关键的一对括号放在上下两行，可能会导致转换失败
+    if(sth is 
+    Image) {
         // ...
     }
 }
