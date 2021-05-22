@@ -456,6 +456,9 @@ var TsMaker = /** @class */ (function () {
             case typescript_estree_1.AST_NODE_TYPES.TSInterfaceDeclaration:
                 str += this.codeFromTSInterfaceDeclaration(ast);
                 break;
+            case typescript_estree_1.AST_NODE_TYPES.TSPropertySignature:
+                str += this.codeFromTSPropertySignature(ast);
+                break;
             case typescript_estree_1.AST_NODE_TYPES.TSTypeAssertion:
                 str += this.codeFromTSTypeAssertion(ast);
                 break;
@@ -1483,6 +1486,13 @@ var TsMaker = /** @class */ (function () {
         str += this.indent(this.codeFromAST(ast.body));
         str += '\n}';
         return str;
+    };
+    TsMaker.prototype.codeFromTSPropertySignature = function (ast) {
+        var str = this.codeFromAST(ast.key);
+        if (ast.typeAnnotation) {
+            str += ': ' + this.codeFromAST(ast.typeAnnotation);
+        }
+        return str + ';';
     };
     TsMaker.prototype.codeFromTSTypeAssertion = function (ast) {
         this.assert(false, ast, 'Not support TSTypeAssertion yet');

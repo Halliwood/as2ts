@@ -89,6 +89,19 @@ var AsTranslator = /** @class */ (function () {
         asContent = asContent.replace(/(?!<\w)Vector\./g, 'Array');
         asContent = asContent.replace(/new Array<([\w|\.]+)>;/g, 'new Array<$1>();');
         asContent = asContent.replace(/new <[\w|\.]+>(?=\[)/g, '');
+        // interface里的getter/setter改成属性
+        if (asContent.indexOf('export interface ') >= 0) {
+            asContent = asContent.replace(/\bget\b\s+(\w+)\s*\(\s*\)/g, '$1');
+            asContent = asContent.replace(/\bset\b\s+(\w+)\s*\(\s*\w+(:\s*(\w+)\s*)?\)(\s*:\s*void)?/g, function (substring) {
+                var args = [];
+                for (var _i = 1; _i < arguments.length; _i++) {
+                    args[_i - 1] = arguments[_i];
+                }
+                var pname = args[0];
+                var ptype = args[2];
+                return pname + ': ' + (ptype ? ptype : 'Object');
+            });
+        }
         return asContent;
     };
     return AsTranslator;
