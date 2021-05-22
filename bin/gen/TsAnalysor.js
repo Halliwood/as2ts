@@ -382,9 +382,12 @@ var TsAnalysor = /** @class */ (function () {
         this.processAST(ast.body);
     };
     TsAnalysor.prototype.processForStatement = function (ast) {
-        this.processAST(ast.init);
-        this.processAST(ast.test);
-        this.processAST(ast.update);
+        if (ast.init)
+            this.processAST(ast.init);
+        if (ast.test)
+            this.processAST(ast.test);
+        if (ast.update)
+            this.processAST(ast.update);
         this.processAST(ast.body);
     };
     TsAnalysor.prototype.processFunctionDeclaration = function (ast) {
@@ -410,7 +413,7 @@ var TsAnalysor = /** @class */ (function () {
             funcInfo.className = this.crtClass.name;
             if (this.crtFunc) {
                 // 这是函数内的一个匿名函数
-                this.assert(!funcName, ast, 'It should be an anoymous function!');
+                // this.assert(!funcName, ast, 'It should be an anoymous function!');
                 this.crtFunc.anoymousFuncCnt++;
                 funcInfo.name = this.crtFunc.name + '~' + this.crtFunc.anoymousFuncCnt;
                 funcInfo.parentFunc = this.crtFunc;
