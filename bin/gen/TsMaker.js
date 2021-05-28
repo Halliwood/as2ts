@@ -1114,7 +1114,7 @@ var TsMaker = /** @class */ (function () {
         if (this.calPriority(ast.callee) > this.calPriority(ast)) {
             callee = '(' + callee + ')';
         }
-        if ('Array' == callee /* && ast.arguments.length == 0*/) {
+        if ('Array' == callee && ast.arguments.length == 0) {
             return '[]';
         }
         var argStr = '';
@@ -1578,7 +1578,9 @@ var TsMaker = /** @class */ (function () {
                 superClassFullName = this.option.idReplacement[superClassFullName];
             }
             classInfo = this.analysor.classFullNameMap[superClassFullName];
-            this.assert(null != classInfo, ast, 'Could not find super class info: ' + superClassFullName);
+            if (!classInfo) {
+                console.warn('Could not find super class info: ' + superClassFullName);
+            }
             if (classInfo) {
                 var finfo_1 = classInfo.functionMap[pname];
                 if (finfo_1 && finfo_1.accessibility != 'private') {
